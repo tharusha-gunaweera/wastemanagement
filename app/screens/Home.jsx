@@ -1,47 +1,78 @@
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import React, { useEffect, useState } from 'react';
-import Home from './screens/Home'; // Make sure the path is correct
-import OnboardingScreen from './screens/OnboardingScreen';
-import LoginScreen from './screens/SignIn/SignIn';
-import SplashScreen from './screens/SplashScreen';
+// Home.jsx
+import { StyleSheet, Text, View } from 'react-native';
+import CycleCircle from '../Components/CycleCircle';
 
-const Stack = createNativeStackNavigator(); 
-
-export default function App() {
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (isLoading) {
-    return <SplashScreen onAnimationComplete={() => setIsLoading(false)} />;
-  }
-
+export default function Home() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator initialRouteName="Login">
-        <Stack.Screen 
-          name="Login" 
-          component={LoginScreen}
-          options={{ headerShown: false }}
+    <View style={styles.container}>
+      <Text style={styles.title}>Cycle Tracker</Text>
+      <Text style={styles.subtitle}>Your current cycle progress</Text>
+      
+      <View style={{ marginVertical: 30 }}>
+        <CycleCircle 
+          periodDays={5} 
+          fertileDays={6} 
+          totalDays={28}
+          currentDay={11}
         />
-        <Stack.Screen 
-          name="Onboarding" 
-          component={OnboardingScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen 
-          name="Home" 
-          component={Home}
-          options={{ headerShown: false }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+      </View>
+
+      <View style={styles.statsContainer}>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>5</Text>
+          <Text style={styles.statLabel}>Period days left</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>14</Text>
+          <Text style={styles.statLabel}>Days completed</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>9</Text>
+          <Text style={styles.statLabel}>Days remaining</Text>
+        </View>
+      </View>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    backgroundColor: '#FAFAFA'
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    marginBottom: 8,
+    color: '#333',
+    letterSpacing: -0.5
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 20
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginTop: 30,
+    paddingHorizontal: 20
+  },
+  statItem: {
+    alignItems: 'center'
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333'
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4
+  }
+});

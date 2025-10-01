@@ -54,13 +54,13 @@ const OnboardingScreen = () => {
         useNativeDriver: true,
       }).start();
     } else {
-      // Navigate to Home screen after onboarding
-      navigation.navigate('Home');
+      // Navigate to Login screen after onboarding
+      navigation.navigate('Login');
     }
   };
 
   const skipOnboarding = () => {
-    navigation.navigate('Home');
+    navigation.navigate('Login');
   };
 
   React.useEffect(() => {
