@@ -1,9 +1,8 @@
 // App.jsx
-import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
-import Home from './screens/Home';
 import SplashScreen from './screens/SplashScreen';
+import LoginScreen from './screens/SignIn/SignIn';
 
 const Stack = createNativeStackNavigator(); 
 
@@ -25,29 +24,16 @@ export default function App() {
 
   return (
     
-      <Stack.Navigator 
-        initialRouteName="Home"
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: '#8BC8F8',
-          },
-          headerTintColor: '#fff',
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
-          headerTitleAlign: 'center',
-        }}
-      >
+  
+      <Stack.Navigator initialRouteName="Login">
         <Stack.Screen 
-          name="Home" 
-          component={Home}
-          options={{
-            title: 'PeriodPal',
-            headerStyle: {
-              backgroundColor: '#ff9b9b',
-            },
-          }}
+          name="Login" 
+          component={LoginScreen}
+          options={{ headerShown: false }}
         />
+        {/* Add other screens here */}
       </Stack.Navigator>
+    
+   
   );
 }
