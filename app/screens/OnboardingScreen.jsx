@@ -1,13 +1,13 @@
 import { useNavigation } from '@react-navigation/native';
 import React, { useState } from 'react';
 import {
-    Animated,
-    Dimensions,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Animated,
+  Dimensions,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
@@ -54,7 +54,7 @@ const OnboardingScreen = () => {
         useNativeDriver: true,
       }).start();
     } else {
-      // Navigate to Login screen after onboarding
+      
       navigation.navigate('Login');
     }
   };
