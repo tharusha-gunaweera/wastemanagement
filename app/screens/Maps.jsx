@@ -3,10 +3,13 @@ import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
 import {
   Alert,
+  Dimensions,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -14,6 +17,8 @@ import {
   View
 } from 'react-native';
 import MapView, { Callout, Marker, Polyline } from 'react-native-maps';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 // Sample menstrual products data
 const menstrualProducts = [
@@ -27,13 +32,34 @@ const menstrualProducts = [
   { id: 8, name: 'Heating Pad', emoji: '🔥' }
 ];
 
+// Sample location photos (using placeholder images)
+const locationPhotos = [
+  { id: 1, uri: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=400&h=300&fit=crop', description: 'Front entrance' },
+  { id: 2, uri: 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=400&h=300&fit=crop', description: 'Building view' },
+  { id: 3, uri: 'https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400&h=300&fit=crop', description: 'Street view' },
+  { id: 4, uri: 'https://images.unsplash.com/photo-1574362848142-d312d3bf8deb?w=400&h=300&fit=crop', description: 'Delivery spot' }
+];
+
+// Sample location descriptions
+const locationDescriptions = [
+  "Apartment building with blue door. Look for the flower pots near the entrance.",
+  "Two-story house with white fence. Parking available on the street.",
+  "Office building - deliver to reception desk on the ground floor.",
+  "Townhouse complex - unit number is clearly marked on the door.",
+  "Single family home with red brick exterior. Ring the bell twice.",
+  "Condominium building - use intercom system to contact resident.",
+  "House with green shutters. Leave package in the covered porch.",
+  "Apartment complex - building C, third floor."
+];
+
 // Generate random customer data for demo
-const generateCustomerData = () => {
+const generateCustomerData = (address) => {
   const names = ['Emma Wilson', 'Sophia Chen', 'Maya Patel', 'Olivia Garcia', 'Isabella Kim', 'Ava Johnson', 'Mia Davis', 'Charlotte Brown'];
   const phones = ['+1-555-0101', '+1-555-0102', '+1-555-0103', '+1-555-0104', '+1-555-0105', '+1-555-0106', '+1-555-0107', '+1-555-0108'];
   
   const randomName = names[Math.floor(Math.random() * names.length)];
   const randomPhone = phones[Math.floor(Math.random() * phones.length)];
+  const randomDescription = locationDescriptions[Math.floor(Math.random() * locationDescriptions.length)];
   
   // Generate random products (2-4 items)
   const productCount = Math.floor(Math.random() * 3) + 2;
@@ -50,13 +76,26 @@ const generateCustomerData = () => {
   const urgencies = ['Low', 'Medium', 'High'];
   const urgency = urgencies[Math.floor(Math.random() * urgencies.length)];
   
+  // Select 2-3 random photos
+  const photoCount = Math.floor(Math.random() * 2) + 2;
+  const selectedPhotos = [];
+  const availablePhotos = [...locationPhotos];
+  
+  for (let i = 0; i < photoCount; i++) {
+    const randomIndex = Math.floor(Math.random() * availablePhotos.length);
+    selectedPhotos.push(availablePhotos[randomIndex]);
+    availablePhotos.splice(randomIndex, 1);
+  }
+
   return {
     name: randomName,
     phone: randomPhone,
     products: selectedProducts,
     urgency: urgency,
     specialInstructions: Math.random() > 0.7 ? 'Please ring doorbell twice' : 'Leave at front door',
-    deliveryTime: `Within ${Math.floor(Math.random() * 4) + 1} hours`
+    deliveryTime: `Within ${Math.floor(Math.random() * 4) + 1} hours`,
+    locationDescription: randomDescription,
+    photos: selectedPhotos
   };
 };
 
@@ -74,6 +113,7 @@ const MapScreen = () => {
   const [showDeliveryList, setShowDeliveryList] = useState(false);
   const [optimizedRoute, setOptimizedRoute] = useState([]);
   const [selectedDelivery, setSelectedDelivery] = useState(null);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
 
   // Get user's current location
   useEffect(() => {
@@ -115,7 +155,7 @@ const MapScreen = () => {
 
       if (response.data && response.data.length > 0) {
         const firstResult = response.data[0];
-        const customerData = generateCustomerData();
+        const customerData = generateCustomerData(firstResult.display_name);
         
         const newDelivery = {
           id: Date.now().toString(),
@@ -295,10 +335,28 @@ const MapScreen = () => {
 
   const handleCalloutPress = (delivery) => {
     setSelectedDelivery(delivery);
+    setSelectedPhotoIndex(0);
   };
 
   const closeCallout = () => {
     setSelectedDelivery(null);
+    setSelectedPhotoIndex(0);
+  };
+
+  const nextPhoto = () => {
+    if (selectedDelivery) {
+      setSelectedPhotoIndex((prev) => 
+        prev === selectedDelivery.customer.photos.length - 1 ? 0 : prev + 1
+      );
+    }
+  };
+
+  const prevPhoto = () => {
+    if (selectedDelivery) {
+      setSelectedPhotoIndex((prev) => 
+        prev === 0 ? selectedDelivery.customer.photos.length - 1 : prev - 1
+      );
+    }
   };
 
   return (
@@ -394,12 +452,86 @@ const MapScreen = () => {
         <View style={styles.popupOverlay}>
           <View style={styles.popupContainer}>
             {selectedDelivery && (
-              <>
+              <ScrollView style={styles.popupScrollView} showsVerticalScrollIndicator={false}>
                 <View style={styles.popupHeader}>
                   <Text style={styles.popupTitle}>Delivery Details</Text>
                   <TouchableOpacity onPress={closeCallout} style={styles.closePopupButton}>
                     <Text style={styles.closePopupText}>✕</Text>
                   </TouchableOpacity>
+                </View>
+
+                {/* Photo Gallery Section */}
+                {selectedDelivery.customer.photos.length > 0 && (
+                  <View style={styles.photoGallerySection}>
+                    <Text style={styles.sectionTitle}>📸 Location Photos</Text>
+                    <View style={styles.photoGallery}>
+                      <View style={styles.mainPhotoContainer}>
+                        <Image 
+                          source={{ uri: selectedDelivery.customer.photos[selectedPhotoIndex].uri }}
+                          style={styles.mainPhoto}
+                          resizeMode="cover"
+                        />
+                        {selectedDelivery.customer.photos.length > 1 && (
+                          <>
+                            <TouchableOpacity style={[styles.photoNavButton, styles.prevButton]} onPress={prevPhoto}>
+                              <Text style={styles.photoNavText}>‹</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.photoNavButton, styles.nextButton]} onPress={nextPhoto}>
+                              <Text style={styles.photoNavText}>›</Text>
+                            </TouchableOpacity>
+                          </>
+                        )}
+                        <View style={styles.photoCounter}>
+                          <Text style={styles.photoCounterText}>
+                            {selectedPhotoIndex + 1} / {selectedDelivery.customer.photos.length}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={styles.photoDescription}>
+                        {selectedDelivery.customer.photos[selectedPhotoIndex].description}
+                      </Text>
+                      
+                      {/* Thumbnail Strip */}
+                      {selectedDelivery.customer.photos.length > 1 && (
+                        <ScrollView 
+                          horizontal 
+                          showsHorizontalScrollIndicator={false}
+                          style={styles.thumbnailStrip}
+                        >
+                          {selectedDelivery.customer.photos.map((photo, index) => (
+                            <TouchableOpacity 
+                              key={photo.id}
+                              style={[
+                                styles.thumbnailContainer,
+                                index === selectedPhotoIndex && styles.selectedThumbnail
+                              ]}
+                              onPress={() => setSelectedPhotoIndex(index)}
+                            >
+                              <Image 
+                                source={{ uri: photo.uri }}
+                                style={styles.thumbnail}
+                                resizeMode="cover"
+                              />
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      )}
+                    </View>
+                  </View>
+                )}
+
+                {/* Location Description Section */}
+                <View style={styles.locationDescriptionSection}>
+                  <Text style={styles.sectionTitle}>📍 Location Details</Text>
+                  <View style={styles.descriptionCard}>
+                    <Text style={styles.locationDescription}>
+                      {selectedDelivery.customer.locationDescription}
+                    </Text>
+                    <View style={styles.addressCard}>
+                      <Text style={styles.addressLabel}>Full Address:</Text>
+                      <Text style={styles.addressText}>{selectedDelivery.address}</Text>
+                    </View>
+                  </View>
                 </View>
 
                 <View style={styles.customerSection}>
@@ -429,10 +561,6 @@ const MapScreen = () => {
 
                 <View style={styles.deliveryInfoSection}>
                   <Text style={styles.sectionTitle}>🚚 Delivery Information</Text>
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Address:</Text>
-                    <Text style={styles.infoValue}>{selectedDelivery.address}</Text>
-                  </View>
                   <View style={styles.infoRow}>
                     <Text style={styles.infoLabel}>Delivery Time:</Text>
                     <Text style={styles.infoValue}>{selectedDelivery.customer.deliveryTime}</Text>
@@ -470,12 +598,13 @@ const MapScreen = () => {
                     </Text>
                   </TouchableOpacity>
                 </View>
-              </>
+              </ScrollView>
             )}
           </View>
         </View>
       </Modal>
 
+      {/* Rest of the component remains the same... */}
       {/* Action Buttons - Bottom Right Corner */}
       <View style={styles.actionButtonsContainer}>
         <TouchableOpacity 
@@ -575,6 +704,11 @@ const MapScreen = () => {
                       <Text style={styles.moreProducts}>+{item.customer.products.length - 3}</Text>
                     )}
                   </View>
+                  {item.customer.photos.length > 0 && (
+                    <View style={styles.photosPreview}>
+                      <Text style={styles.photosPreviewText}>📸 {item.customer.photos.length} photos</Text>
+                    </View>
+                  )}
                 </View>
                 
                 <View style={styles.deliveryActions}>
@@ -622,136 +756,235 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   // Search Bar Styles
-  searchContainer: {
+  // Search Bar Styles
+searchContainer: {
+  position: 'absolute',
+  top: 15,
+  left: 20,
+  right: 20,
+  zIndex: 1,
+},
+searchInnerContainer: {
+  flexDirection: 'row',
+  backgroundColor: 'white',
+  borderRadius: 25,
+  padding: 8,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 10 },
+  shadowOpacity: 0.1,
+  shadowRadius: 20,
+  elevation: 10,
+  borderWidth: 1,
+  borderColor: '#f0f0f0',
+},
+searchIconContainer: {
+  paddingHorizontal: 12,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+searchIcon: {
+  fontSize: 18,
+},
+searchInput: {
+  flex: 1,
+  height: 40,
+  fontSize: 16,
+  color: '#333',
+  paddingHorizontal: 8,
+},
+searchButton: {
+  paddingHorizontal: 20,
+  paddingVertical: 10,
+  borderRadius: 20,
+  justifyContent: 'center',
+  alignItems: 'center',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 3,
+  elevation: 3,
+},
+searchButtonActive: {
+  backgroundColor: '#FF6B6B',
+},
+searchButtonInactive: {
+  backgroundColor: '#E0E0E0',
+},
+searchButtonText: {
+  color: 'white',
+  fontWeight: 'bold',
+  fontSize: 14,
+},
+deliveryCountBadge: {
+  backgroundColor: '#4ECDC4',
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 12,
+  alignSelf: 'flex-start',
+  marginTop: 8,
+  marginLeft: 10,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 3,
+  elevation: 3,
+},
+deliveryCountText: {
+  color: 'white',
+  fontSize: 12,
+  fontWeight: 'bold',
+},
+  // ... (previous search bar styles remain the same)
+
+  // New Photo Gallery Styles
+  photoGallerySection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  photoGallery: {
+    marginBottom: 10,
+  },
+  mainPhotoContainer: {
+    position: 'relative',
+    height: 200,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  mainPhoto: {
+    width: '100%',
+    height: '100%',
+  },
+  photoNavButton: {
     position: 'absolute',
-    top: 15,
-    left: 20,
-    right: 20,
-    zIndex: 1,
-  },
-  searchInnerContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
-    borderRadius: 25,
-    padding: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
-  },
-  searchIconContainer: {
-    paddingHorizontal: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  searchIcon: {
-    fontSize: 18,
-  },
-  searchInput: {
-    flex: 1,
+    top: '50%',
+    transform: [{ translateY: -20 }],
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    width: 40,
     height: 40,
-    fontSize: 16,
-    color: '#333',
-    paddingHorizontal: 8,
-  },
-  searchButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
   },
-  searchButtonActive: {
-    backgroundColor: '#FF6B6B',
+  prevButton: {
+    left: 10,
   },
-  searchButtonInactive: {
-    backgroundColor: '#E0E0E0',
+  nextButton: {
+    right: 10,
   },
-  searchButtonText: {
+  photoNavText: {
     color: 'white',
+    fontSize: 20,
     fontWeight: 'bold',
-    fontSize: 14,
   },
-  deliveryCountBadge: {
-    backgroundColor: '#4ECDC4',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-    marginTop: 8,
-    marginLeft: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+  photoCounter: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
-  deliveryCountText: {
+  photoCounterText: {
     color: 'white',
     fontSize: 12,
     fontWeight: 'bold',
   },
-  // Callout Styles
-  calloutContainer: {
-    backgroundColor: 'white',
-    padding: 12,
-    borderRadius: 12,
-    width: 200,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  calloutTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  calloutAddress: {
+  photoDescription: {
     fontSize: 12,
     color: '#666',
-    marginBottom: 6,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginBottom: 8,
   },
-  calloutCustomer: {
+  thumbnailStrip: {
+    marginTop: 8,
+  },
+  thumbnailContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  selectedThumbnail: {
+    borderColor: '#FF6B6B',
+  },
+  thumbnail: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 6,
+  },
+  // Location Description Styles
+  locationDescriptionSection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  descriptionCard: {
+    backgroundColor: '#f8f9fa',
+    padding: 16,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4ECDC4',
+  },
+  locationDescription: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  addressCard: {
+    backgroundColor: 'white',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  addressLabel: {
     fontSize: 12,
-    color: '#4ECDC4',
-    fontWeight: '600',
+    fontWeight: 'bold',
+    color: '#666',
     marginBottom: 4,
   },
-  calloutTap: {
-    fontSize: 10,
-    color: '#FF6B6B',
-    fontStyle: 'italic',
+  addressText: {
+    fontSize: 13,
+    color: '#333',
+    lineHeight: 18,
   },
-  // Popup Modal Styles
+  // Updated Popup Styles
+  popupScrollView: {
+    maxHeight: '80%',
+  },
+  popupContainer: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    width: '100%',
+    maxHeight: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  // Photos Preview in List
+  photosPreview: {
+    marginTop: 4,
+  },
+  photosPreviewText: {
+    fontSize: 11,
+    color: '#666',
+  },
+  // ... (rest of the previous styles remain the same)
   popupOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-  },
-  popupContainer: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 0,
-    width: '100%',
-    maxHeight: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
   },
   popupHeader: {
     flexDirection: 'row',
@@ -896,7 +1129,41 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  // Rest of the styles remain the same...
+  // Callout Styles
+  calloutContainer: {
+    backgroundColor: 'white',
+    padding: 12,
+    borderRadius: 12,
+    width: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  calloutTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  calloutAddress: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 6,
+  },
+  calloutCustomer: {
+    fontSize: 12,
+    color: '#4ECDC4',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  calloutTap: {
+    fontSize: 10,
+    color: '#FF6B6B',
+    fontStyle: 'italic',
+  },
+  // Action Buttons
   actionButtonsContainer: {
     position: 'absolute',
     bottom: 30,
