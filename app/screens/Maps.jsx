@@ -2,18 +2,63 @@ import axios from 'axios';
 import * as Location from 'expo-location';
 import { useEffect, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
+import MapView, { Callout, Marker, Polyline } from 'react-native-maps';
+
+// Sample menstrual products data
+const menstrualProducts = [
+  { id: 1, name: 'Regular Pads', emoji: '🔴' },
+  { id: 2, name: 'Super Pads', emoji: '🔵' },
+  { id: 3, name: 'Tampons', emoji: '⚪' },
+  { id: 4, name: 'Menstrual Cups', emoji: '🥤' },
+  { id: 5, name: 'Pantyliners', emoji: '🩲' },
+  { id: 6, name: 'Period Panties', emoji: '👙' },
+  { id: 7, name: 'Pain Relief', emoji: '💊' },
+  { id: 8, name: 'Heating Pad', emoji: '🔥' }
+];
+
+// Generate random customer data for demo
+const generateCustomerData = () => {
+  const names = ['Emma Wilson', 'Sophia Chen', 'Maya Patel', 'Olivia Garcia', 'Isabella Kim', 'Ava Johnson', 'Mia Davis', 'Charlotte Brown'];
+  const phones = ['+1-555-0101', '+1-555-0102', '+1-555-0103', '+1-555-0104', '+1-555-0105', '+1-555-0106', '+1-555-0107', '+1-555-0108'];
+  
+  const randomName = names[Math.floor(Math.random() * names.length)];
+  const randomPhone = phones[Math.floor(Math.random() * phones.length)];
+  
+  // Generate random products (2-4 items)
+  const productCount = Math.floor(Math.random() * 3) + 2;
+  const selectedProducts = [];
+  const availableProducts = [...menstrualProducts];
+  
+  for (let i = 0; i < productCount; i++) {
+    const randomIndex = Math.floor(Math.random() * availableProducts.length);
+    selectedProducts.push(availableProducts[randomIndex]);
+    availableProducts.splice(randomIndex, 1);
+  }
+  
+  // Generate random urgency
+  const urgencies = ['Low', 'Medium', 'High'];
+  const urgency = urgencies[Math.floor(Math.random() * urgencies.length)];
+  
+  return {
+    name: randomName,
+    phone: randomPhone,
+    products: selectedProducts,
+    urgency: urgency,
+    specialInstructions: Math.random() > 0.7 ? 'Please ring doorbell twice' : 'Leave at front door',
+    deliveryTime: `Within ${Math.floor(Math.random() * 4) + 1} hours`
+  };
+};
 
 const MapScreen = () => {
   const [region, setRegion] = useState({
@@ -28,6 +73,7 @@ const MapScreen = () => {
   const [userLocation, setUserLocation] = useState(null);
   const [showDeliveryList, setShowDeliveryList] = useState(false);
   const [optimizedRoute, setOptimizedRoute] = useState([]);
+  const [selectedDelivery, setSelectedDelivery] = useState(null);
 
   // Get user's current location
   useEffect(() => {
@@ -69,13 +115,16 @@ const MapScreen = () => {
 
       if (response.data && response.data.length > 0) {
         const firstResult = response.data[0];
+        const customerData = generateCustomerData();
+        
         const newDelivery = {
           id: Date.now().toString(),
           latitude: parseFloat(firstResult.lat),
           longitude: parseFloat(firstResult.lon),
           address: firstResult.display_name,
           completed: false,
-          type: 'delivery'
+          type: 'delivery',
+          customer: customerData
         };
 
         setDeliveries(prev => [...prev, newDelivery]);
@@ -103,6 +152,7 @@ const MapScreen = () => {
   const removeDelivery = (id) => {
     setDeliveries(prev => prev.filter(delivery => delivery.id !== id));
     setOptimizedRoute([]); // Clear route when deliveries change
+    setSelectedDelivery(null); // Close popup if open
   };
 
   // Mark delivery as completed
@@ -220,6 +270,7 @@ const MapScreen = () => {
   const clearAllDeliveries = () => {
     setDeliveries([]);
     setOptimizedRoute([]);
+    setSelectedDelivery(null);
   };
 
   // Calculate formatted distance between two points for display
@@ -231,6 +282,23 @@ const MapScreen = () => {
   const getMarkerColor = (delivery) => {
     if (delivery.type === 'user') return 'blue';
     return delivery.completed ? 'green' : 'red';
+  };
+
+  const getUrgencyColor = (urgency) => {
+    switch (urgency) {
+      case 'High': return '#FF6B6B';
+      case 'Medium': return '#FFA726';
+      case 'Low': return '#4ECDC4';
+      default: return '#4ECDC4';
+    }
+  };
+
+  const handleCalloutPress = (delivery) => {
+    setSelectedDelivery(delivery);
+  };
+
+  const closeCallout = () => {
+    setSelectedDelivery(null);
   };
 
   return (
@@ -286,9 +354,23 @@ const MapScreen = () => {
             key={delivery.id}
             coordinate={delivery}
             title={`Delivery ${index + 1}`}
-            description={delivery.address}
+            description="Tap for details"
             pinColor={getMarkerColor(delivery)}
-          />
+            onCalloutPress={() => handleCalloutPress(delivery)}
+          >
+            <Callout tooltip={true}>
+              <View style={styles.calloutContainer}>
+                <Text style={styles.calloutTitle}>Delivery {index + 1}</Text>
+                <Text style={styles.calloutAddress} numberOfLines={2}>
+                  {delivery.address}
+                </Text>
+                <Text style={styles.calloutCustomer}>
+                  👤 {delivery.customer.name}
+                </Text>
+                <Text style={styles.calloutTap}>Tap to view details →</Text>
+              </View>
+            </Callout>
+          </Marker>
         ))}
         
         {/* Optimized Route Line */}
@@ -302,6 +384,98 @@ const MapScreen = () => {
         )}
       </MapView>
 
+      {/* Delivery Details Popup Modal */}
+      <Modal
+        visible={!!selectedDelivery}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={closeCallout}
+      >
+        <View style={styles.popupOverlay}>
+          <View style={styles.popupContainer}>
+            {selectedDelivery && (
+              <>
+                <View style={styles.popupHeader}>
+                  <Text style={styles.popupTitle}>Delivery Details</Text>
+                  <TouchableOpacity onPress={closeCallout} style={styles.closePopupButton}>
+                    <Text style={styles.closePopupText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.customerSection}>
+                  <Text style={styles.sectionTitle}>👤 Customer Information</Text>
+                  <View style={styles.customerInfo}>
+                    <Text style={styles.customerName}>{selectedDelivery.customer.name}</Text>
+                    <Text style={styles.customerPhone}>📞 {selectedDelivery.customer.phone}</Text>
+                    <View style={[styles.urgencyBadge, { backgroundColor: getUrgencyColor(selectedDelivery.customer.urgency) }]}>
+                      <Text style={styles.urgencyText}>
+                        ⚡ {selectedDelivery.customer.urgency} Priority
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.productsSection}>
+                  <Text style={styles.sectionTitle}>🛍️ Requested Products</Text>
+                  <View style={styles.productsList}>
+                    {selectedDelivery.customer.products.map((product, index) => (
+                      <View key={index} style={styles.productItem}>
+                        <Text style={styles.productEmoji}>{product.emoji}</Text>
+                        <Text style={styles.productName}>{product.name}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.deliveryInfoSection}>
+                  <Text style={styles.sectionTitle}>🚚 Delivery Information</Text>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Address:</Text>
+                    <Text style={styles.infoValue}>{selectedDelivery.address}</Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Delivery Time:</Text>
+                    <Text style={styles.infoValue}>{selectedDelivery.customer.deliveryTime}</Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Instructions:</Text>
+                    <Text style={styles.infoValue}>{selectedDelivery.customer.specialInstructions}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.popupActions}>
+                  <TouchableOpacity 
+                    style={[styles.actionBtn, styles.callButton]}
+                    onPress={() => Alert.alert('Call', `Calling ${selectedDelivery.customer.phone}`)}
+                  >
+                    <Text style={styles.actionBtnText}>📞 Call Customer</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[styles.actionBtn, styles.navigateButton]}
+                    onPress={() => Alert.alert('Navigate', `Navigating to ${selectedDelivery.address}`)}
+                  >
+                    <Text style={styles.actionBtnText}>🧭 Start Navigation</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={[styles.actionBtn, selectedDelivery.completed ? styles.undoButton : styles.completeButton]}
+                    onPress={() => {
+                      toggleDeliveryCompletion(selectedDelivery.id);
+                      closeCallout();
+                    }}
+                  >
+                    <Text style={styles.actionBtnText}>
+                      {selectedDelivery.completed ? '↶ Mark Pending' : '✓ Mark Delivered'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
       {/* Action Buttons - Bottom Right Corner */}
       <View style={styles.actionButtonsContainer}>
         <TouchableOpacity 
@@ -309,7 +483,7 @@ const MapScreen = () => {
           onPress={() => setShowDeliveryList(true)}
         >
           <Text style={styles.actionButtonIcon}>📋</Text>
-          <Text style={styles.actionButtonText}><List></List></Text>
+          <Text style={styles.actionButtonText}>Deliveries</Text>
           {deliveries.length > 0 && (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{deliveries.length}</Text>
@@ -392,16 +566,15 @@ const MapScreen = () => {
                   <Text style={styles.deliveryAddress} numberOfLines={2}>
                     {item.address}
                   </Text>
-                  {userLocation && (
-                    <Text style={styles.deliveryDistance}>
-                      📏 {calculateDistance(
-                        userLocation.latitude,
-                        userLocation.longitude,
-                        item.latitude,
-                        item.longitude
-                      )} km away
-                    </Text>
-                  )}
+                  <Text style={styles.customerNameSmall}>👤 {item.customer.name}</Text>
+                  <View style={styles.productsPreview}>
+                    {item.customer.products.slice(0, 3).map((product, idx) => (
+                      <Text key={idx} style={styles.productPreview}>{product.emoji}</Text>
+                    ))}
+                    {item.customer.products.length > 3 && (
+                      <Text style={styles.moreProducts}>+{item.customer.products.length - 3}</Text>
+                    )}
+                  </View>
                 </View>
                 
                 <View style={styles.deliveryActions}>
@@ -448,10 +621,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  // Beautiful Search Bar Styles - Moved Higher
+  // Search Bar Styles
   searchContainer: {
     position: 'absolute',
-    top: 15, // Moved from 50 to 15 - much higher!
+    top: 15,
     left: 20,
     right: 20,
     zIndex: 1,
@@ -526,7 +699,204 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-  // Action Buttons
+  // Callout Styles
+  calloutContainer: {
+    backgroundColor: 'white',
+    padding: 12,
+    borderRadius: 12,
+    width: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  calloutTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  calloutAddress: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 6,
+  },
+  calloutCustomer: {
+    fontSize: 12,
+    color: '#4ECDC4',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  calloutTap: {
+    fontSize: 10,
+    color: '#FF6B6B',
+    fontStyle: 'italic',
+  },
+  // Popup Modal Styles
+  popupOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  popupContainer: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 0,
+    width: '100%',
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  popupHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    backgroundColor: '#fafafa',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  popupTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  closePopupButton: {
+    padding: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closePopupText: {
+    color: '#666',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  customerSection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  productsSection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  deliveryInfoSection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+  },
+  customerInfo: {
+    marginBottom: 8,
+  },
+  customerName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  customerPhone: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 8,
+  },
+  urgencyBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  urgencyText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  productsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  productItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  productEmoji: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  productName: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  infoLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#666',
+    width: '30%',
+  },
+  infoValue: {
+    fontSize: 14,
+    color: '#333',
+    width: '68%',
+    flexWrap: 'wrap',
+  },
+  popupActions: {
+    padding: 20,
+    gap: 12,
+  },
+  actionBtn: {
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  callButton: {
+    backgroundColor: '#4ECDC4',
+  },
+  navigateButton: {
+    backgroundColor: '#FFA726',
+  },
+  completeButton: {
+    backgroundColor: '#6BCF7F',
+  },
+  undoButton: {
+    backgroundColor: '#FFE66D',
+  },
+  actionBtnText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  // Rest of the styles remain the same...
   actionButtonsContainer: {
     position: 'absolute',
     bottom: 30,
@@ -582,7 +952,6 @@ const styles = StyleSheet.create({
   map: {
     flex: 1,
   },
-  // Modal Styles
   modalContainer: {
     flex: 1,
     backgroundColor: 'white',
@@ -636,7 +1005,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  // Delivery List Styles
   deliveryItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -684,6 +1052,24 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '500',
     marginBottom: 4,
+  },
+  customerNameSmall: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 4,
+  },
+  productsPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  productPreview: {
+    fontSize: 14,
+    marginRight: 4,
+  },
+  moreProducts: {
+    fontSize: 11,
+    color: '#999',
+    fontStyle: 'italic',
   },
   deliveryDistance: {
     fontSize: 12,
