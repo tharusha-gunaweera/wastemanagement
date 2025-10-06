@@ -1,6 +1,6 @@
 // Home.jsx
 import { StyleSheet, Text, View } from 'react-native';
-import CycleCircle from '../Components/CycleCircle';
+import CycleCircle from '../../Components/CycleCircle';
 
 export default function Home() {
   return (

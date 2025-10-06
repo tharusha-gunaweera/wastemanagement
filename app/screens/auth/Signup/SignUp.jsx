@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createUserWithEmailAndPassword } from "firebase/auth";
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -19,55 +20,29 @@ const SignUpScreen = ({ navigation }) => {
     firstName: '',
     lastName: '',
     email: '',
+    birthDate: '',
     password: '',
-    confirmPassword: '',
-    birthDate: ''
+    confirmPassword: ''
   });
   const [loading, setLoading] = useState(false);
 
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const validateForm = () => {
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.confirmPassword) {
-      Alert.alert('Error', 'Please fill in all required fields');
-      return false;
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
-      return false;
-    }
-
-    if (formData.password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters long');
-      return false;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return false;
-    }
-
-    return true;
+  const handleInputChange = (key, value) => {
+    setFormData({ ...formData, [key]: value });
   };
 
   const handleSignUp = async () => {
-    if (!validateForm()) return;
-    setLoading(true);
+    const { email, password, confirmPassword } = formData;
+    if (!email || !password) return Alert.alert('Error', 'Please fill all required fields.');
+    if (password !== confirmPassword) return Alert.alert('Error', 'Passwords do not match.');
 
+    setLoading(true);
     try {
-      await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      await AsyncStorage.setItem('user', JSON.stringify(userCredential.user)); // store user
       Alert.alert('Success', 'Account created successfully!');
-      navigation.navigate('Login');
+      navigation.replace('MainApp');
     } catch (error) {
-      console.error('Sign up error:', error);
-      Alert.alert('Error', error.message || 'Failed to create account');
+      Alert.alert('Sign Up Failed', error.message);
     } finally {
       setLoading(false);
     }
@@ -78,7 +53,7 @@ const SignUpScreen = ({ navigation }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -93,11 +68,11 @@ const SignUpScreen = ({ navigation }) => {
             <Text style={styles.subtitle}>Create your account</Text>
           </View>
 
-          {/* Sign Up Form */}
+          {/* Form */}
           <View style={styles.formContainer}>
             <Text style={styles.formTitle}>Get Started</Text>
 
-            {/* Name Row */}
+            {/* First + Last Name */}
             <View style={styles.nameRow}>
               <View style={[styles.inputContainer, styles.halfInput]}>
                 <Text style={styles.label}>First Name *</Text>
@@ -106,8 +81,7 @@ const SignUpScreen = ({ navigation }) => {
                   placeholder="First name"
                   placeholderTextColor="#9CA3AF"
                   value={formData.firstName}
-                  onChangeText={(value) => handleInputChange('firstName', value)}
-                  autoCapitalize="words"
+                  onChangeText={(v) => handleInputChange('firstName', v)}
                 />
               </View>
 
@@ -118,8 +92,7 @@ const SignUpScreen = ({ navigation }) => {
                   placeholder="Last name"
                   placeholderTextColor="#9CA3AF"
                   value={formData.lastName}
-                  onChangeText={(value) => handleInputChange('lastName', value)}
-                  autoCapitalize="words"
+                  onChangeText={(v) => handleInputChange('lastName', v)}
                 />
               </View>
             </View>
@@ -132,14 +105,13 @@ const SignUpScreen = ({ navigation }) => {
                 placeholder="Enter your email"
                 placeholderTextColor="#9CA3AF"
                 value={formData.email}
-                onChangeText={(value) => handleInputChange('email', value)}
+                onChangeText={(v) => handleInputChange('email', v)}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                autoComplete="email"
               />
             </View>
 
-            {/* Birth Date (Optional) */}
+            {/* Birth Date */}
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Birth Date</Text>
               <TextInput
@@ -147,8 +119,7 @@ const SignUpScreen = ({ navigation }) => {
                 placeholder="YYYY-MM-DD (Optional)"
                 placeholderTextColor="#9CA3AF"
                 value={formData.birthDate}
-                onChangeText={(value) => handleInputChange('birthDate', value)}
-                keyboardType="numbers-and-punctuation"
+                onChangeText={(v) => handleInputChange('birthDate', v)}
               />
             </View>
 
@@ -160,7 +131,7 @@ const SignUpScreen = ({ navigation }) => {
                 placeholder="Create a password"
                 placeholderTextColor="#9CA3AF"
                 value={formData.password}
-                onChangeText={(value) => handleInputChange('password', value)}
+                onChangeText={(v) => handleInputChange('password', v)}
                 secureTextEntry
                 autoCapitalize="none"
               />
@@ -172,25 +143,25 @@ const SignUpScreen = ({ navigation }) => {
               <Text style={styles.label}>Confirm Password *</Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="Confirm your password"
+                placeholder="Confirm password"
                 placeholderTextColor="#9CA3AF"
                 value={formData.confirmPassword}
-                onChangeText={(value) => handleInputChange('confirmPassword', value)}
+                onChangeText={(v) => handleInputChange('confirmPassword', v)}
                 secureTextEntry
                 autoCapitalize="none"
               />
             </View>
 
-            {/* Terms and Conditions */}
+            {/* Terms */}
             <View style={styles.termsContainer}>
               <Text style={styles.termsText}>
-                By creating an account, you agree to our{' '}
+                By signing up, you agree to our{' '}
                 <Text style={styles.termsLink}>Terms of Service</Text> and{' '}
-                <Text style={styles.termsLink}>Privacy Policy</Text>
+                <Text style={styles.termsLink}>Privacy Policy</Text>.
               </Text>
             </View>
 
-            {/* Sign Up Button */}
+            {/* Button */}
             <TouchableOpacity
               style={[styles.signUpButton, loading && styles.signUpButtonDisabled]}
               onPress={handleSignUp}
@@ -203,7 +174,7 @@ const SignUpScreen = ({ navigation }) => {
               )}
             </TouchableOpacity>
 
-            {/* Login Link */}
+            {/* Login link */}
             <View style={styles.loginContainer}>
               <Text style={styles.loginText}>Already have an account? </Text>
               <TouchableOpacity onPress={() => navigation.navigate('Login')}>
@@ -212,7 +183,7 @@ const SignUpScreen = ({ navigation }) => {
             </View>
           </View>
 
-          {/* Privacy Info */}
+          {/* Info */}
           <View style={styles.infoContainer}>
             <Text style={styles.infoText}>
               Your data is encrypted and secure. We never share your personal information.
@@ -225,22 +196,18 @@ const SignUpScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#FDF2F8' 
-  },
-  scrollContainer: { 
-    flexGrow: 1 
-  },
-  content: { 
-    flex: 1, paddingHorizontal: 24, justifyContent: 'center' 
-  },
-  header: { 
-    alignItems: 'center', marginBottom: 32 
-  },
+  container: { flex: 1, backgroundColor: '#FDF2F8' },
+  scrollContainer: { flexGrow: 1 },
+  content: { flex: 1, paddingHorizontal: 24, justifyContent: 'center' },
+  header: { alignItems: 'center', marginBottom: 32 },
   logoContainer: {
-    width: 70, height: 70, backgroundColor: '#EC4899',
-    borderRadius: 35, alignItems: 'center', justifyContent: 'center', marginBottom: 12,
+    width: 70,
+    height: 70,
+    backgroundColor: '#EC4899',
+    borderRadius: 35,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
   },
   logoText: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold' },
   appName: { fontSize: 28, fontWeight: 'bold', color: '#EC4899', marginBottom: 4 },
