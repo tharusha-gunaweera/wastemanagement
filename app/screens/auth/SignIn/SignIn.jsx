@@ -1,3 +1,4 @@
+import { signInWithEmailAndPassword } from "firebase/auth";
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,53 +13,44 @@ import {
   View
 } from 'react-native';
 
+
+import { auth } from '../../../../FirebaseConfig';
+
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
+const handleLogin = async () => {
+  setLoading(true);
 
-    setLoading(true);
+  try {
+    // Firebase authentication
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
 
-    try {
-      // Your API call here
-      const response = await fetch('https://your-api.com/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': 'YOUR_API_KEY',
-        },
-        body: JSON.stringify({ email, password }),
-      });
+    Alert.alert('Success', `Welcome back, ${user.email}!`);
+    
 
-      const data = await response.json();
+    // navigate to home screen
+    navigation.navigate('Home');
 
-      if (response.ok) {
-        Alert.alert('Success', 'Welcome back!');
-        // Navigate to main app
-        // navigation.navigate('Home');
-      } else {
-        Alert.alert('Login Failed', data.message || 'Invalid credentials');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Network error. Please try again.');
-      console.error('Login error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (error) {
+    console.log('Login error:', error);
+    console.log('User logged in:', user.email);
+    Alert.alert('Error', 'Sign in failed: ' + error.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled"
       >

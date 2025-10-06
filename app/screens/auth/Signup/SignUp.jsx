@@ -1,16 +1,18 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
+import { createUserWithEmailAndPassword } from "firebase/auth";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
+import { auth } from '../../../../FirebaseConfig';
 
 const SignUpScreen = ({ navigation }) => {
   const [formData, setFormData] = useState({
@@ -57,37 +59,15 @@ const SignUpScreen = ({ navigation }) => {
 
   const handleSignUp = async () => {
     if (!validateForm()) return;
-
     setLoading(true);
 
     try {
-      // Your API call here
-      const response = await fetch('https://your-api.com/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': 'YOUR_API_KEY',
-        },
-        body: JSON.stringify({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          password: formData.password,
-          birthDate: formData.birthDate
-        }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        Alert.alert('Success', 'Account created successfully!');
-        navigation.navigate('Login');
-      } else {
-        Alert.alert('Sign Up Failed', data.message || 'Something went wrong');
-      }
+      await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      Alert.alert('Success', 'Account created successfully!');
+      navigation.navigate('Login');
     } catch (error) {
-      Alert.alert('Error', 'Network error. Please try again.');
       console.error('Sign up error:', error);
+      Alert.alert('Error', error.message || 'Failed to create account');
     } finally {
       setLoading(false);
     }
@@ -245,46 +225,26 @@ const SignUpScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FDF2F8',
+  container: { 
+    flex: 1, 
+    backgroundColor: '#FDF2F8' 
   },
-  scrollContainer: {
-    flexGrow: 1,
+  scrollContainer: { 
+    flexGrow: 1 
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    justifyContent: 'center',
+  content: { 
+    flex: 1, paddingHorizontal: 24, justifyContent: 'center' 
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 32,
+  header: { 
+    alignItems: 'center', marginBottom: 32 
   },
   logoContainer: {
-    width: 70,
-    height: 70,
-    backgroundColor: '#EC4899',
-    borderRadius: 35,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
+    width: 70, height: 70, backgroundColor: '#EC4899',
+    borderRadius: 35, alignItems: 'center', justifyContent: 'center', marginBottom: 12,
   },
-  logoText: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  appName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#EC4899',
-    marginBottom: 4,
-  },
-  subtitle: {
-    color: '#6B7280',
-    fontSize: 16,
-  },
+  logoText: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold' },
+  appName: { fontSize: 28, fontWeight: 'bold', color: '#EC4899', marginBottom: 4 },
+  subtitle: { color: '#6B7280', fontSize: 16 },
   formContainer: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -295,30 +255,11 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  formTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  nameRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  halfInput: {
-    flex: 0.48,
-  },
-  inputContainer: {
-    marginBottom: 16,
-  },
-  label: {
-    color: '#1F2937',
-    fontWeight: '500',
-    marginBottom: 6,
-    fontSize: 14,
-  },
+  formTitle: { fontSize: 22, fontWeight: 'bold', color: '#1F2937', marginBottom: 20, textAlign: 'center' },
+  nameRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  halfInput: { flex: 0.48 },
+  inputContainer: { marginBottom: 16 },
+  label: { color: '#1F2937', fontWeight: '500', marginBottom: 6, fontSize: 14 },
   textInput: {
     backgroundColor: '#F9FAFB',
     borderWidth: 1,
@@ -329,26 +270,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1F2937',
   },
-  passwordHint: {
-    color: '#6B7280',
-    fontSize: 12,
-    marginTop: 4,
-    marginLeft: 4,
-  },
-  termsContainer: {
-    marginBottom: 20,
-    marginTop: 8,
-  },
-  termsText: {
-    color: '#6B7280',
-    fontSize: 12,
-    textAlign: 'center',
-    lineHeight: 16,
-  },
-  termsLink: {
-    color: '#EC4899',
-    fontWeight: '500',
-  },
+  passwordHint: { color: '#6B7280', fontSize: 12, marginTop: 4, marginLeft: 4 },
+  termsContainer: { marginBottom: 20, marginTop: 8 },
+  termsText: { color: '#6B7280', fontSize: 12, textAlign: 'center', lineHeight: 16 },
+  termsLink: { color: '#EC4899', fontWeight: '500' },
   signUpButton: {
     backgroundColor: '#EC4899',
     borderRadius: 12,
@@ -357,37 +282,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 20,
   },
-  signUpButtonDisabled: {
-    opacity: 0.7,
-  },
-  signUpButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  loginContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loginText: {
-    color: '#6B7280',
-    fontSize: 14,
-  },
-  loginLink: {
-    color: '#EC4899',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  infoContainer: {
-    marginTop: 20,
-  },
-  infoText: {
-    textAlign: 'center',
-    color: '#6B7280',
-    fontSize: 12,
-    lineHeight: 16,
-  },
+  signUpButtonDisabled: { opacity: 0.7 },
+  signUpButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
+  loginContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  loginText: { color: '#6B7280', fontSize: 14 },
+  loginLink: { color: '#EC4899', fontWeight: 'bold', fontSize: 14 },
+  infoContainer: { marginTop: 20 },
+  infoText: { textAlign: 'center', color: '#6B7280', fontSize: 12, lineHeight: 16 },
 });
 
 export default SignUpScreen;

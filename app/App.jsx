@@ -2,12 +2,12 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
 import 'react-native-gesture-handler';
-import Home from './screens/Home'; // Make sure this path is correct
 import CommunityListScreen from './screens/Community/CommunityListScreen';
+import Home from './screens/Home'; // Make sure this path is correct
 //import CommunityChatScreen from './screens/Community/CommunityChatScreen';
+import LoginScreen from './screens/auth/SignIn/SignIn';
+import SignUpScreen from './screens/auth/Signup/SignUp';
 import OnboardingScreen from './screens/OnboardingScreen';
-import LoginScreen from './screens/SignIn/SignIn';
-import SignUpScreen from './screens/Signup/SignUp';
 import SplashScreen from './screens/SplashScreen';
 
 const Stack = createNativeStackNavigator(); 

@@ -55,12 +55,12 @@ const OnboardingScreen = () => {
       }).start();
     } else {
       
-      navigation.navigate('CommunityList');
+      navigation.navigate('Login');
     }
   };
 
   const skipOnboarding = () => {
-    navigation.navigate('CommunityList');
+    navigation.navigate('Login');
   };
 
   React.useEffect(() => {
