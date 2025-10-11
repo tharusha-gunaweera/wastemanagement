@@ -7,151 +7,282 @@ import {
     StyleSheet,
     Alert,
     ActivityIndicator,
-    Image
+    Modal,
+    TextInput,
+    ScrollView
 } from 'react-native';
+import { 
+    collection, 
+    addDoc, 
+    getDocs, 
+    doc, 
+    updateDoc, 
+    onSnapshot, 
+    arrayUnion, 
+    arrayRemove, 
+    increment, 
+    serverTimestamp 
+} from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { db, auth } from '../../../FirebaseConfig';
 
 const CommunityListScreen = ({ navigation }) => {
     const [communities, setCommunities] = useState([]);
     const [loading, setLoading] = useState(true);
     const [joining, setJoining] = useState(null);
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [creating, setCreating] = useState(false);
+    const [currentUser, setCurrentUser] = useState(null);
 
-    // Mock data - replace with actual API call
-    const mockCommunities = [
-        {
-            id: '1',
-            name: 'Teens Support Group',
-            description: 'A safe space for teenagers to discuss period health',
-            memberCount: 1250,
-            image: '👧',
-            isPublic: true
-        },
-        {
-            id: '2',
-            name: 'PCOS Warriors',
-            description: 'Support group for people with PCOS',
-            memberCount: 890,
-            image: '💪',
-            isPublic: true
-        },
-        {
-            id: '3',
-            name: 'First Time Moms',
-            description: 'Postpartum and period discussions for new moms',
-            memberCount: 2100,
-            image: '👶',
-            isPublic: false
-        },
-        {
-            id: '4',
-            name: 'Endometriosis Support',
-            description: 'Community for endometriosis awareness and support',
-            memberCount: 1500,
-            image: '❤️',
-            isPublic: true
-        }
-    ];
-
-    // Mock user communities - replace with actual API call
-    const mockUserCommunities = [
-        { communityId: '1', status: 'approved' },
-        { communityId: '2', status: 'pending' }
-    ];
+    // Create community form state
+    const [communityForm, setCommunityForm] = useState({
+        name: '',
+        description: '',
+        locationData: '',
+        isPublic: true
+    });
 
     useEffect(() => {
+        // Get current user
+        const user = getAuth().currentUser;
+        setCurrentUser(user);
+        
+        // Load communities from Firebase
         loadCommunities();
+        
+        // Set up real-time listener
+        const unsubscribe = setupCommunityListener();
+        
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
     }, []);
 
+    // Real-time listener for communities
+    const setupCommunityListener = () => {
+        return onSnapshot(collection(db, 'communities'),
+            (querySnapshot) => {
+                const communitiesData = [];
+                querySnapshot.forEach((doc) => {
+                    communitiesData.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+                setCommunities(communitiesData);
+                setLoading(false);
+            },
+            (error) => {
+                console.error('Error listening to communities:', error);
+                Alert.alert('Error', 'Failed to load communities');
+                setLoading(false);
+            }
+        );
+    };
+
+    // Load communities from Firebase
     const loadCommunities = async () => {
         try {
-            // Simulate API call
-            setTimeout(() => {
-                const communitiesWithStatus = mockCommunities.map(community => {
-                    const userCommunity = mockUserCommunities.find(uc => uc.communityId === community.id);
-                    return {
-                        ...community,
-                        userStatus: userCommunity ? userCommunity.status : 'not_joined'
-                    };
+            const querySnapshot = await getDocs(collection(db, 'communities'));
+
+            const communitiesData = [];
+            querySnapshot.forEach((doc) => {
+                communitiesData.push({
+                    id: doc.id,
+                    ...doc.data()
                 });
-                setCommunities(communitiesWithStatus);
-                setLoading(false);
-            }, 1000);
+            });
+
+            setCommunities(communitiesData);
+            setLoading(false);
         } catch (error) {
+            console.error('Error loading communities:', error);
             Alert.alert('Error', 'Failed to load communities');
             setLoading(false);
         }
     };
 
-    const handleJoinCommunity = async (communityId) => {
-        setJoining(communityId);
-        
+    // Create community function
+    const handleCreateCommunity = async () => {
+        if (!communityForm.name.trim()) {
+            Alert.alert('Error', 'Please enter community name');
+            return;
+        }
+
+        if (!currentUser) {
+            Alert.alert('Error', 'You must be logged in to create a community');
+            return;
+        }
+
+        setCreating(true);
+
         try {
-            // Simulate API call to join community
-            setTimeout(() => {
-                setCommunities(prev => prev.map(community => 
-                    community.id === communityId 
-                        ? { ...community, userStatus: 'pending' }
-                        : community
-                ));
-                setJoining(null);
-                Alert.alert('Success', 'Join request sent! Waiting for admin approval.');
-            }, 1500);
+            const communityData = {
+                Name: communityForm.name,
+                Description: communityForm.description,
+                LocationData: communityForm.locationData,
+                creator: currentUser.uid,
+                Members: [currentUser.uid],
+                isPublic: communityForm.isPublic,
+                memberCount: 1,
+                createdAt: serverTimestamp(),
+                image: '👥'
+            };
+
+            // Add community to Firestore
+            const docRef = await addDoc(collection(db, 'communities'), communityData);
+
+            console.log('Community created with ID:', docRef.id);
+            
+            Alert.alert('Success', 'Community created successfully!');
+            setShowCreateModal(false);
+            resetForm();
+            
         } catch (error) {
+            console.error('Error creating community:', error);
+            Alert.alert('Error', 'Failed to create community');
+        } finally {
+            setCreating(false);
+        }
+    };
+
+    // Join community function
+    const handleJoinCommunity = async (communityId) => {
+        if (!currentUser) {
+            Alert.alert('Error', 'You must be logged in to join a community');
+            return;
+        }
+
+        setJoining(communityId);
+
+        try {
+            const communityRef = doc(db, 'communities', communityId);
+            
+            // Add user to members array
+            await updateDoc(communityRef, {
+                Members: arrayUnion(currentUser.uid),
+                memberCount: increment(1)
+            });
+
+            Alert.alert('Success', 'Successfully joined the community!');
+            
+        } catch (error) {
+            console.error('Error joining community:', error);
             Alert.alert('Error', 'Failed to join community');
+        } finally {
             setJoining(null);
         }
+    };
+
+    // Leave community function
+    const handleLeaveCommunity = async (communityId) => {
+        if (!currentUser) {
+            Alert.alert('Error', 'You must be logged in to leave a community');
+            return;
+        }
+
+        try {
+            const communityRef = doc(db, 'communities', communityId);
+            
+            // Remove user from members array
+            await updateDoc(communityRef, {
+                Members: arrayRemove(currentUser.uid),
+                memberCount: increment(-1)
+            });
+
+            Alert.alert('Success', 'You have left the community');
+            
+        } catch (error) {
+            console.error('Error leaving community:', error);
+            Alert.alert('Error', 'Failed to leave community');
+        }
+    };
+
+    // Check if current user is a member of a community
+    const isUserMember = (community) => {
+        if (!currentUser) return false;
+        return community.Members && community.Members.includes(currentUser.uid);
+    };
+
+    // Check if current user is the creator of a community
+    const isUserCreator = (community) => {
+        if (!currentUser) return false;
+        return community.creator === currentUser.uid;
+    };
+
+    const resetForm = () => {
+        setCommunityForm({
+            name: '',
+            description: '',
+            locationData: '',
+            isPublic: true
+        });
     };
 
     const handleOpenChat = (communityId) => {
         navigation.navigate('CommunityChat', { communityId });
     };
 
-    const renderCommunityItem = ({ item }) => (
-        <View style={styles.communityCard}>
-            <View style={styles.communityHeader}>
-                <Text style={styles.communityEmoji}>{item.image}</Text>
-                <View style={styles.communityInfo}>
-                    <Text style={styles.communityName}>{item.name}</Text>
-                    <Text style={styles.communityDescription}>{item.description}</Text>
-                    <Text style={styles.memberCount}>{item.memberCount.toLocaleString()} members</Text>
-                    <Text style={styles.privacyBadge}>
-                        {item.isPublic ? 'Public' : 'Private'}
-                    </Text>
+    const renderCommunityItem = ({ item }) => {
+        const isMember = isUserMember(item);
+        const isCreator = isUserCreator(item);
+
+        return (
+            <View style={styles.communityCard}>
+                <View style={styles.communityHeader}>
+                    <Text style={styles.communityEmoji}>{item.image || '👥'}</Text>
+                    <View style={styles.communityInfo}>
+                        <Text style={styles.communityName}>{item.Name}</Text>
+                        <Text style={styles.communityDescription}>{item.Description}</Text>
+                        {item.LocationData && (
+                            <Text style={styles.locationText}>📍 {item.LocationData}</Text>
+                        )}
+                        <Text style={styles.memberCount}>{item.memberCount || 1} members</Text>
+                        <Text style={styles.privacyBadge}>
+                            {item.isPublic ? 'Public' : 'Private'}
+                        </Text>
+                        {isCreator && (
+                            <Text style={styles.creatorBadge}>👑 Admin</Text>
+                        )}
+                    </View>
+                </View>
+
+                <View style={styles.actionContainer}>
+                    {!isMember ? (
+                        <TouchableOpacity
+                            style={styles.joinButton}
+                            onPress={() => handleJoinCommunity(item.id)}
+                            disabled={joining === item.id}
+                        >
+                            {joining === item.id ? (
+                                <ActivityIndicator color="#FFFFFF" size="small" />
+                            ) : (
+                                <Text style={styles.joinButtonText}>Join Community</Text>
+                            )}
+                        </TouchableOpacity>
+                    ) : (
+                        <View style={styles.memberActions}>
+                            <TouchableOpacity
+                                style={styles.chatButton}
+                                onPress={() => handleOpenChat(item.id)}
+                            >
+                                <Text style={styles.chatButtonText}>Open Chat</Text>
+                            </TouchableOpacity>
+                            
+                            {!isCreator && (
+                                <TouchableOpacity
+                                    style={styles.leaveButton}
+                                    onPress={() => handleLeaveCommunity(item.id)}
+                                >
+                                    <Text style={styles.leaveButtonText}>Leave</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    )}
                 </View>
             </View>
-
-            <View style={styles.actionContainer}>
-                {item.userStatus === 'not_joined' && (
-                    <TouchableOpacity
-                        style={styles.joinButton}
-                        onPress={() => handleJoinCommunity(item.id)}
-                        disabled={joining === item.id}
-                    >
-                        {joining === item.id ? (
-                            <ActivityIndicator color="#FFFFFF" size="small" />
-                        ) : (
-                            <Text style={styles.joinButtonText}>Join Community</Text>
-                        )}
-                    </TouchableOpacity>
-                )}
-
-                {item.userStatus === 'pending' && (
-                    <View style={styles.pendingContainer}>
-                        <Text style={styles.pendingText}>Pending Approval</Text>
-                        <Text style={styles.pendingSubText}>Waiting for admin</Text>
-                    </View>
-                )}
-
-                {item.userStatus === 'approved' && (
-                    <TouchableOpacity
-                        style={styles.chatButton}
-                        onPress={() => handleOpenChat(item.id)}
-                    >
-                        <Text style={styles.chatButtonText}>Open Chat</Text>
-                    </TouchableOpacity>
-                )}
-            </View>
-        </View>
-    );
+        );
+    };
 
     if (loading) {
         return (
@@ -164,11 +295,18 @@ const CommunityListScreen = ({ navigation }) => {
 
     return (
         <View style={styles.container}>
+            {/* Header with Create Button */}
             <View style={styles.header}>
                 <Text style={styles.title}>Communities</Text>
                 <Text style={styles.subtitle}>
-                    Join supportive communities and connect with others
+                    Join supportive communities or create your own
                 </Text>
+                <TouchableOpacity
+                    style={styles.createButton}
+                    onPress={() => setShowCreateModal(true)}
+                >
+                    <Text style={styles.createButtonText}>+ Create Community</Text>
+                </TouchableOpacity>
             </View>
 
             <FlatList
@@ -177,7 +315,126 @@ const CommunityListScreen = ({ navigation }) => {
                 keyExtractor={item => item.id}
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.listContainer}
+                ListEmptyComponent={
+                    <View style={styles.emptyContainer}>
+                        <Text style={styles.emptyText}>No communities found</Text>
+                        <Text style={styles.emptySubText}>
+                            Be the first to create a community!
+                        </Text>
+                    </View>
+                }
             />
+
+            {/* Create Community Modal */}
+            <Modal
+                visible={showCreateModal}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowCreateModal(false)}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Create Community</Text>
+                        
+                        <ScrollView style={styles.formContainer}>
+                            {/* Community Name */}
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>Community Name *</Text>
+                                <TextInput
+                                    style={styles.textInput}
+                                    placeholder="Enter community name"
+                                    value={communityForm.name}
+                                    onChangeText={(text) => setCommunityForm(prev => ({ ...prev, name: text }))}
+                                />
+                            </View>
+
+                            {/* Description */}
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>Description</Text>
+                                <TextInput
+                                    style={[styles.textInput, styles.textArea]}
+                                    placeholder="Describe your community"
+                                    value={communityForm.description}
+                                    onChangeText={(text) => setCommunityForm(prev => ({ ...prev, description: text }))}
+                                    multiline
+                                    numberOfLines={3}
+                                />
+                            </View>
+
+                            {/* Location Data */}
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>Location</Text>
+                                <TextInput
+                                    style={styles.textInput}
+                                    placeholder="Enter location (e.g., Colombo, Sri Lanka)"
+                                    value={communityForm.locationData}
+                                    onChangeText={(text) => setCommunityForm(prev => ({ ...prev, locationData: text }))}
+                                />
+                            </View>
+
+                            {/* Privacy Setting */}
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>Privacy Setting</Text>
+                                <View style={styles.privacyOptions}>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.privacyOption,
+                                            communityForm.isPublic && styles.privacyOptionSelected
+                                        ]}
+                                        onPress={() => setCommunityForm(prev => ({ ...prev, isPublic: true }))}
+                                    >
+                                        <Text style={[
+                                            styles.privacyOptionText,
+                                            communityForm.isPublic && styles.privacyOptionTextSelected
+                                        ]}>
+                                            Public
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.privacyOption,
+                                            !communityForm.isPublic && styles.privacyOptionSelected
+                                        ]}
+                                        onPress={() => setCommunityForm(prev => ({ ...prev, isPublic: false }))}
+                                    >
+                                        <Text style={[
+                                            styles.privacyOptionText,
+                                            !communityForm.isPublic && styles.privacyOptionTextSelected
+                                        ]}>
+                                            Private
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            {/* Action Buttons */}
+                            <View style={styles.modalActions}>
+                                <TouchableOpacity
+                                    style={styles.cancelButton}
+                                    onPress={() => {
+                                        setShowCreateModal(false);
+                                        resetForm();
+                                    }}
+                                    disabled={creating}
+                                >
+                                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.createModalButton, creating && styles.createModalButtonDisabled]}
+                                    onPress={handleCreateCommunity}
+                                    disabled={creating}
+                                >
+                                    {creating ? (
+                                        <ActivityIndicator color="#FFFFFF" size="small" />
+                                    ) : (
+                                        <Text style={styles.createModalButtonText}>Create</Text>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
@@ -220,6 +477,18 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#6B7280',
         lineHeight: 22,
+        marginBottom: 16,
+    },
+    createButton: {
+        backgroundColor: '#8B5CF6',
+        borderRadius: 12,
+        paddingVertical: 12,
+        alignItems: 'center',
+    },
+    createButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: 'bold',
     },
     listContainer: {
         padding: 16,
@@ -258,6 +527,12 @@ const styles = StyleSheet.create({
         marginBottom: 8,
         lineHeight: 20,
     },
+    locationText: {
+        fontSize: 12,
+        color: '#8B5CF6',
+        fontWeight: '500',
+        marginBottom: 4,
+    },
     memberCount: {
         fontSize: 12,
         color: '#EC4899',
@@ -268,6 +543,12 @@ const styles = StyleSheet.create({
         color: '#8B5CF6',
         fontWeight: '500',
         marginTop: 4,
+    },
+    creatorBadge: {
+        fontSize: 11,
+        color: '#F59E0B',
+        fontWeight: '500',
+        marginTop: 2,
     },
     actionContainer: {
         borderTopWidth: 1,
@@ -286,24 +567,10 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
     },
-    pendingContainer: {
+    memberActions: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 12,
-        backgroundColor: '#FEF3C7',
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: '#F59E0B',
-    },
-    pendingText: {
-        color: '#92400E',
-        fontSize: 16,
-        fontWeight: 'bold',
-        marginBottom: 4,
-    },
-    pendingSubText: {
-        color: '#92400E',
-        fontSize: 12,
-        opacity: 0.8,
     },
     chatButton: {
         backgroundColor: '#8B5CF6',
@@ -311,8 +578,140 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         alignItems: 'center',
         justifyContent: 'center',
+        flex: 2,
+        marginRight: 8,
     },
     chatButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    leaveButton: {
+        backgroundColor: '#EF4444',
+        borderRadius: 12,
+        paddingVertical: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        flex: 1,
+    },
+    leaveButtonText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: 'bold',
+    },
+    emptyContainer: {
+        alignItems: 'center',
+        padding: 40,
+    },
+    emptyText: {
+        fontSize: 18,
+        color: '#6B7280',
+        marginBottom: 8,
+    },
+    emptySubText: {
+        fontSize: 14,
+        color: '#9CA3AF',
+        textAlign: 'center',
+    },
+    modalContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        padding: 20,
+    },
+    modalContent: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        padding: 20,
+        maxHeight: '80%',
+    },
+    modalTitle: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#EC4899',
+        marginBottom: 20,
+        textAlign: 'center',
+    },
+    formContainer: {
+        maxHeight: 400,
+    },
+    inputContainer: {
+        marginBottom: 16,
+    },
+    label: {
+        fontSize: 16,
+        fontWeight: '500',
+        color: '#1F2937',
+        marginBottom: 8,
+    },
+    textInput: {
+        backgroundColor: '#F9FAFB',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        fontSize: 16,
+        color: '#1F2937',
+    },
+    textArea: {
+        height: 80,
+        textAlignVertical: 'top',
+    },
+    privacyOptions: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    privacyOption: {
+        flex: 1,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderRadius: 12,
+        padding: 12,
+        alignItems: 'center',
+    },
+    privacyOptionSelected: {
+        backgroundColor: '#EC4899',
+        borderColor: '#EC4899',
+    },
+    privacyOptionText: {
+        color: '#6B7280',
+        fontSize: 16,
+    },
+    privacyOptionTextSelected: {
+        color: '#FFFFFF',
+        fontWeight: '500',
+    },
+    modalActions: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 20,
+    },
+    cancelButton: {
+        flex: 1,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+    },
+    cancelButtonText: {
+        color: '#6B7280',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    createModalButton: {
+        flex: 2,
+        backgroundColor: '#EC4899',
+        borderRadius: 8,
+        padding: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    createModalButtonDisabled: {
+        opacity: 0.6,
+    },
+    createModalButtonText: {
         color: '#FFFFFF',
         fontSize: 16,
         fontWeight: 'bold',
