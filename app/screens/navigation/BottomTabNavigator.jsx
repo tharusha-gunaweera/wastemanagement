@@ -7,6 +7,7 @@ import Ionicons from 'react-native-vector-icons/Ionicons';
 // Import your actual screens - UPDATE THESE IMPORTS
 import CommunityListScreen from '../Community/CommunityListScreen';
 import Home from '../Tracker/Home';
+import Maps from '../Maps'
 
 const Tab = createBottomTabNavigator();
 const CommunityStack = createNativeStackNavigator();
@@ -81,7 +82,7 @@ export default function BottomTabNavigator() {
     >
       <Tab.Screen 
         name="Home" 
-        component={Home} // Using your existing Home component
+        component={Maps} // Using your existing Home component
         options={{
           title: 'Home',
           headerTitle: 'Cycle Tracker', // Custom header title for Home
