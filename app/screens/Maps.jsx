@@ -388,7 +388,7 @@ const MapScreen = () => {
           />
         )}
         
-        {/* Delivery Location Markers */}
+        {/* Delivery Location Markers - FIXED FOR ANDROID */}
         {deliveries.map((delivery, index) => (
           <Marker
             key={delivery.id}
@@ -396,7 +396,7 @@ const MapScreen = () => {
             title={`Delivery ${index + 1}`}
             description="Tap for details"
             pinColor={getMarkerColor(delivery)}
-            onCalloutPress={() => handleCalloutPress(delivery)}
+            onPress={() => handleCalloutPress(delivery)} // ✅ FIX: Changed from onCalloutPress to onPress
           >
             <Callout tooltip={true}>
               <View style={styles.calloutContainer}>
@@ -766,7 +766,6 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
   },
-  // ... (rest of the styles remain mostly the same, just removing search-related styles)
   popupScrollView: {
     maxHeight: '80%',
   },
