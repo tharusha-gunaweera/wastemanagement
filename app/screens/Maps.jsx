@@ -373,7 +373,7 @@ const MapScreen = () => {
     <View style={styles.container}>
       {/* Header with Title */}
       <View style={styles.headerContainer}>
-        <Text style={styles.headerTitle}>🚚 Sri Lanka Deliveries</Text>
+        <Text style={styles.headerTitle}>🚚 Deliveries</Text>
         <Text style={styles.headerSubtitle}>Tap on any location pin to view details</Text>
       </View>
 
