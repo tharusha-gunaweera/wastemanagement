@@ -32,30 +32,40 @@ const menstrualProducts = [
   { id: 8, name: 'Heating Pad', emoji: '🔥' }
 ];
 
-// Sample location photos (using placeholder images)
+// Sri Lankan location photos
 const locationPhotos = [
-  { id: 1, uri: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=400&h=300&fit=crop', description: 'Front entrance' },
-  { id: 2, uri: 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=400&h=300&fit=crop', description: 'Building view' },
-  { id: 3, uri: 'https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400&h=300&fit=crop', description: 'Street view' },
+  { id: 1, uri: 'https://images.unsplash.com/photo-1598974357801-cbca100e65d3?w=400&h=300&fit=crop', description: 'Colombo residential area' },
+  { id: 2, uri: 'https://images.unsplash.com/photo-1580519542036-c47de6196ba5?w=400&h=300&fit=crop', description: 'Kandy neighborhood' },
+  { id: 3, uri: 'https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400&h=300&fit=crop', description: 'Galle street view' },
   { id: 4, uri: 'https://images.unsplash.com/photo-1574362848142-d312d3bf8deb?w=400&h=300&fit=crop', description: 'Delivery spot' }
 ];
 
-// Sample location descriptions
+// Sri Lankan location descriptions
 const locationDescriptions = [
-  "Apartment building with blue door. Look for the flower pots near the entrance.",
-  "Two-story house with white fence. Parking available on the street.",
-  "Office building - deliver to reception desk on the ground floor.",
-  "Townhouse complex - unit number is clearly marked on the door.",
-  "Single family home with red brick exterior. Ring the bell twice.",
-  "Condominium building - use intercom system to contact resident.",
-  "House with green shutters. Leave package in the covered porch.",
-  "Apartment complex - building C, third floor."
+  "Colombo apartment building with security guard. Look for the blue gate.",
+  "Kandy house near Temple of the Tooth. Parking available on the main road.",
+  "Galle Fort heritage building - deliver to the main entrance.",
+  "Negombo beach house with coconut trees in front.",
+  "Jaffna traditional house with red roof. Ring the bell twice.",
+  "Anuradhapura ancient city area - house with garden.",
+  "Trincomalee coastal residence - leave package at security desk.",
+  "Kandy hillside bungalow with mountain view.",
+  "Colombo 7 luxury apartment - use intercom system.",
+  "Gampaha town house near bus stand."
 ];
 
-// Generate random customer data for demo
+// Sri Lankan names and locations
 const generateCustomerData = (address) => {
-  const names = ['Emma Wilson', 'Sophia Chen', 'Maya Patel', 'Olivia Garcia', 'Isabella Kim', 'Ava Johnson', 'Mia Davis', 'Charlotte Brown'];
-  const phones = ['+1-555-0101', '+1-555-0102', '+1-555-0103', '+1-555-0104', '+1-555-0105', '+1-555-0106', '+1-555-0107', '+1-555-0108'];
+  const names = [
+    'Nimasha Perera', 'Sachini Fernando', 'Tharushi Silva', 'Dilini Rathnayake', 
+    'Piumi Gunawardena', 'Chamodi Jayawardena', 'Hasini Bandara', 'Madhavi Wickramasinghe',
+    'Shanika Rajapaksa', 'Anjali Karunaratne', 'Kavindi Alwis', 'Sithara Zoysa'
+  ];
+  
+  const phones = [
+    '+94-77-123-4567', '+94-71-234-5678', '+94-70-345-6789', '+94-76-456-7890',
+    '+94-75-567-8901', '+94-78-678-9012', '+94-72-789-0123', '+94-74-890-1234'
+  ];
   
   const randomName = names[Math.floor(Math.random() * names.length)];
   const randomPhone = phones[Math.floor(Math.random() * phones.length)];
@@ -100,11 +110,12 @@ const generateCustomerData = (address) => {
 };
 
 const MapScreen = () => {
+  // Set initial region to Sri Lanka
   const [region, setRegion] = useState({
-    latitude: 37.78825,
-    longitude: -122.4324,
-    latitudeDelta: 0.0922,
-    longitudeDelta: 0.0421,
+    latitude: 7.8731,
+    longitude: 80.7718,
+    latitudeDelta: 2.0,
+    longitudeDelta: 2.0,
   });
   
   const [deliveries, setDeliveries] = useState([]);
@@ -114,13 +125,32 @@ const MapScreen = () => {
   const [optimizedRoute, setOptimizedRoute] = useState([]);
   const [selectedDelivery, setSelectedDelivery] = useState(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+  
+  // New state for address suggestions
+  const [addressSuggestions, setAddressSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
 
-  // Get user's current location
+  // Get user's current location in Sri Lanka
   useEffect(() => {
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission denied', 'Need location permission to get your current location');
+        // Set default to Colombo if permission denied
+        const defaultLocation = {
+          latitude: 6.9271,
+          longitude: 79.8612,
+          id: 'user',
+          title: 'Your Location',
+          type: 'user'
+        };
+        setUserLocation(defaultLocation);
+        setRegion({
+          ...region,
+          latitude: defaultLocation.latitude,
+          longitude: defaultLocation.longitude,
+        });
         return;
       }
 
@@ -141,50 +171,126 @@ const MapScreen = () => {
     })();
   }, []);
 
-  // Geocode address to coordinates
+  // Fetch address suggestions limited to Sri Lanka
+  const fetchAddressSuggestions = async (query) => {
+    if (!query || query.length < 3) {
+      setAddressSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    setIsLoadingSuggestions(true);
+    try {
+      const response = await axios.get(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}+Sri+Lanka&countrycodes=lk&limit=5&addressdetails=1`
+      );
+
+      if (response.data && response.data.length > 0) {
+        const suggestions = response.data.map((item, index) => ({
+          id: index.toString(),
+          display_name: item.display_name,
+          lat: item.lat,
+          lon: item.lon,
+          type: item.type,
+          class: item.class,
+          address: item.address
+        }));
+        setAddressSuggestions(suggestions);
+        setShowSuggestions(true);
+      } else {
+        setAddressSuggestions([]);
+        setShowSuggestions(false);
+      }
+    } catch (error) {
+      console.error('Error fetching address suggestions:', error);
+      setAddressSuggestions([]);
+      setShowSuggestions(false);
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
+
+  // Handle address input change with debouncing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (address.length >= 3) {
+        fetchAddressSuggestions(address);
+      } else {
+        setAddressSuggestions([]);
+        setShowSuggestions(false);
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [address]);
+
+  // Select an address suggestion
+  const selectAddressSuggestion = (suggestion) => {
+    setAddress(suggestion.display_name);
+    setShowSuggestions(false);
+    
+    // Center map on selected address in Sri Lanka
+    setRegion({
+      latitude: parseFloat(suggestion.lat),
+      longitude: parseFloat(suggestion.lon),
+      latitudeDelta: 0.0922,
+      longitudeDelta: 0.0421,
+    });
+  };
+
+  // Geocode address to coordinates - Sri Lanka only
   const geocodeAddress = async () => {
     if (!address.trim()) {
-      Alert.alert('Error', 'Please enter an address');
+      Alert.alert('Error', 'Please enter an address in Sri Lanka');
       return;
     }
 
     try {
       const response = await axios.get(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}+Sri+Lanka&countrycodes=lk&limit=1`
       );
 
       if (response.data && response.data.length > 0) {
         const firstResult = response.data[0];
-        const customerData = generateCustomerData(firstResult.display_name);
         
-        const newDelivery = {
-          id: Date.now().toString(),
-          latitude: parseFloat(firstResult.lat),
-          longitude: parseFloat(firstResult.lon),
-          address: firstResult.display_name,
-          completed: false,
-          type: 'delivery',
-          customer: customerData
-        };
+        // Check if the result is in Sri Lanka
+        if (firstResult.display_name.toLowerCase().includes('sri lanka') || 
+            (firstResult.address && firstResult.address.country_code === 'lk')) {
+          
+          const customerData = generateCustomerData(firstResult.display_name);
+          
+          const newDelivery = {
+            id: Date.now().toString(),
+            latitude: parseFloat(firstResult.lat),
+            longitude: parseFloat(firstResult.lon),
+            address: firstResult.display_name,
+            completed: false,
+            type: 'delivery',
+            customer: customerData
+          };
 
-        setDeliveries(prev => [...prev, newDelivery]);
-        setAddress('');
-        
-        // Center map on new delivery
-        setRegion({
-          latitude: parseFloat(firstResult.lat),
-          longitude: parseFloat(firstResult.lon),
-          latitudeDelta: 0.0922,
-          longitudeDelta: 0.0421,
-        });
+          setDeliveries(prev => [...prev, newDelivery]);
+          setAddress('');
+          setShowSuggestions(false);
+          
+          // Center map on new delivery
+          setRegion({
+            latitude: parseFloat(firstResult.lat),
+            longitude: parseFloat(firstResult.lon),
+            latitudeDelta: 0.0922,
+            longitudeDelta: 0.0421,
+          });
 
-        Alert.alert('Success', 'Delivery location added!');
+          Alert.alert('Success', 'Delivery location added in Sri Lanka!');
+        } else {
+          Alert.alert('Location Error', 'Please enter an address within Sri Lanka only.');
+        }
       } else {
-        Alert.alert('Error', 'Address not found. Please try a different address.');
+        Alert.alert('Error', 'Address not found in Sri Lanka. Please try a different address.');
       }
     } catch (error) {
       console.error('Geocoding error:', error);
-      Alert.alert('Error', 'Failed to geocode address. Please try again.');
+      Alert.alert('Error', 'Failed to find address. Please try again.');
     }
   };
 
@@ -359,9 +465,31 @@ const MapScreen = () => {
     }
   };
 
+  // Format address suggestion for display - Sri Lanka specific
+  const formatSuggestion = (suggestion) => {
+    const { address } = suggestion;
+    if (address) {
+      // For Sri Lankan addresses, show road and city/district
+      if (address.road && address.city) {
+        return `${address.road}, ${address.city}`;
+      } else if (address.road && address.town) {
+        return `${address.road}, ${address.town}`;
+      } else if (address.road && address.village) {
+        return `${address.road}, ${address.village}`;
+      } else if (address.city) {
+        return `${address.city}, Sri Lanka`;
+      } else if (address.town) {
+        return `${address.town}, Sri Lanka`;
+      }
+    }
+    // Fallback: show first part of display name
+    return suggestion.display_name.split(',')[0];
+  };
+
+
   return (
     <View style={styles.container}>
-      {/* Beautiful Search Bar - Moved Higher */}
+      {/* Beautiful Search Bar with Sri Lanka Focus */}
       <View style={styles.searchContainer}>
         <View style={styles.searchInnerContainer}>
           <View style={styles.searchIconContainer}>
@@ -369,11 +497,13 @@ const MapScreen = () => {
           </View>
           <TextInput
             style={styles.searchInput}
-            placeholder="Where to deliver today?"
-            placeholderTextColor="#999"
+            placeholder="Enter your address..."
+            placeholderTextColor="#818080ff"
             value={address}
             onChangeText={setAddress}
             onSubmitEditing={geocodeAddress}
+            onFocus={() => address.length >= 3 && setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
           />
           <TouchableOpacity 
             style={[
@@ -386,22 +516,63 @@ const MapScreen = () => {
             <Text style={styles.searchButtonText}>Add</Text>
           </TouchableOpacity>
         </View>
+
+      
+
+        {/* Address Suggestions Dropdown */}
+        {showSuggestions && addressSuggestions.length > 0 && (
+          <View style={styles.suggestionsContainer}>
+            <View style={styles.suggestionsHeader}>
+              <Text style={styles.suggestionsHeaderText}>📍 Addresses List </Text>
+            </View>
+            <FlatList
+              data={addressSuggestions}
+              keyExtractor={(item) => item.id}
+              style={styles.suggestionsList}
+              keyboardShouldPersistTaps="handled"
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.suggestionItem}
+                  onPress={() => selectAddressSuggestion(item)}
+                >
+                  <Text style={styles.suggestionIcon}>📍</Text>
+                  <View style={styles.suggestionTextContainer}>
+                    <Text style={styles.suggestionMainText} numberOfLines={1}>
+                      {formatSuggestion(item)}
+                    </Text>
+                    <Text style={styles.suggestionSubText} numberOfLines={1}>
+                      {item.display_name}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+              ItemSeparatorComponent={() => <View style={styles.suggestionSeparator} />}
+            />
+          </View>
+        )}
+
+        {isLoadingSuggestions && (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>🔍 Searching for addresses...</Text>
+          </View>
+        )}
+
         {deliveries.length > 0 && (
           <View style={styles.deliveryCountBadge}>
             <Text style={styles.deliveryCountText}>
-              {deliveries.length} delivery{deliveries.length !== 1 ? 's' : ''} added
+               {deliveries.length} delivery{deliveries.length !== 1 ? 's' : ''} List
             </Text>
           </View>
         )}
       </View>
 
-      {/* Map */}
+      {/* Map focused on Sri Lanka */}
       <MapView style={styles.map} region={region}>
         {/* User Location Marker */}
         {userLocation && (
           <Marker
             coordinate={userLocation}
-            title="Your Location"
+            title="Your Location "
             pinColor={getMarkerColor(userLocation)}
           />
         )}
@@ -454,7 +625,7 @@ const MapScreen = () => {
             {selectedDelivery && (
               <ScrollView style={styles.popupScrollView} showsVerticalScrollIndicator={false}>
                 <View style={styles.popupHeader}>
-                  <Text style={styles.popupTitle}>Delivery Details</Text>
+                  <Text style={styles.popupTitle}> Delivery Details</Text>
                   <TouchableOpacity onPress={closeCallout} style={styles.closePopupButton}>
                     <Text style={styles.closePopupText}>✕</Text>
                   </TouchableOpacity>
@@ -522,7 +693,7 @@ const MapScreen = () => {
 
                 {/* Location Description Section */}
                 <View style={styles.locationDescriptionSection}>
-                  <Text style={styles.sectionTitle}>📍 Location Details</Text>
+                  <Text style={styles.sectionTitle}>📍 Location in Sri Lanka</Text>
                   <View style={styles.descriptionCard}>
                     <Text style={styles.locationDescription}>
                       {selectedDelivery.customer.locationDescription}
@@ -604,7 +775,6 @@ const MapScreen = () => {
         </View>
       </Modal>
 
-      {/* Rest of the component remains the same... */}
       {/* Action Buttons - Bottom Right Corner */}
       <View style={styles.actionButtonsContainer}>
         <TouchableOpacity 
@@ -649,9 +819,9 @@ const MapScreen = () => {
         >
           <View style={styles.modalHeader}>
             <View>
-              <Text style={styles.modalTitle}>Delivery List</Text>
+              <Text style={styles.modalTitle}> Delivery List</Text>
               {optimizedRoute.length > 0 && (
-                <Text style={styles.modalSubtitle}>Optimized Route</Text>
+                <Text style={styles.modalSubtitle}>Optimized Route </Text>
               )}
             </View>
             <TouchableOpacity 
@@ -665,7 +835,7 @@ const MapScreen = () => {
           {optimizedRoute.length > 0 && (
             <View style={styles.routeInfo}>
               <Text style={styles.routeInfoText}>
-                📍 Total Route: {calculateTotalDistance(optimizedRoute)} km
+                📍 Total Route: {calculateTotalDistance(optimizedRoute)} km in Sri Lanka
               </Text>
             </View>
           )}
@@ -735,12 +905,12 @@ const MapScreen = () => {
             )}
             ListEmptyComponent={
               <View style={styles.emptyState}>
-                <Text style={styles.emptyStateEmoji}>📭</Text>
+                <Text style={styles.emptyStateEmoji}>🇱🇰</Text>
                 <Text style={styles.emptyStateText}>
-                  No deliveries added yet
+                  No deliveries in  yet
                 </Text>
                 <Text style={styles.emptyStateSubtext}>
-                  Add addresses above to get started!
+                  Add  addresses above to get started!
                 </Text>
               </View>
             }
@@ -756,87 +926,177 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   // Search Bar Styles
-  // Search Bar Styles
-searchContainer: {
-  position: 'absolute',
-  top: 15,
-  left: 20,
-  right: 20,
-  zIndex: 1,
-},
-searchInnerContainer: {
-  flexDirection: 'row',
-  backgroundColor: 'white',
-  borderRadius: 25,
-  padding: 8,
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 10 },
-  shadowOpacity: 0.1,
-  shadowRadius: 20,
-  elevation: 10,
-  borderWidth: 1,
-  borderColor: '#f0f0f0',
-},
-searchIconContainer: {
-  paddingHorizontal: 12,
-  justifyContent: 'center',
-  alignItems: 'center',
-},
-searchIcon: {
-  fontSize: 18,
-},
-searchInput: {
-  flex: 1,
-  height: 40,
-  fontSize: 16,
-  color: '#333',
-  paddingHorizontal: 8,
-},
-searchButton: {
-  paddingHorizontal: 20,
-  paddingVertical: 10,
-  borderRadius: 20,
-  justifyContent: 'center',
-  alignItems: 'center',
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.1,
-  shadowRadius: 3,
-  elevation: 3,
-},
-searchButtonActive: {
-  backgroundColor: '#FF6B6B',
-},
-searchButtonInactive: {
-  backgroundColor: '#E0E0E0',
-},
-searchButtonText: {
-  color: 'white',
-  fontWeight: 'bold',
-  fontSize: 14,
-},
-deliveryCountBadge: {
-  backgroundColor: '#4ECDC4',
-  paddingHorizontal: 12,
-  paddingVertical: 6,
-  borderRadius: 12,
-  alignSelf: 'flex-start',
-  marginTop: 8,
-  marginLeft: 10,
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.1,
-  shadowRadius: 3,
-  elevation: 3,
-},
-deliveryCountText: {
-  color: 'white',
-  fontSize: 12,
-  fontWeight: 'bold',
-},
-  // ... (previous search bar styles remain the same)
-
-  // New Photo Gallery Styles
+  searchContainer: {
+    position: 'absolute',
+    top: 15,
+    left: 20,
+    right: 20,
+    zIndex: 1,
+  },
+  searchInnerContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    borderRadius: 25,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
+  searchIconContainer: {
+    paddingHorizontal: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchIcon: {
+    fontSize: 18,
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    fontSize: 16,
+    color: '#333',
+    paddingHorizontal: 8,
+  },
+  searchButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  searchButtonActive: {
+    backgroundColor: '#FF6B6B',
+  },
+  searchButtonInactive: {
+    backgroundColor: '#E0E0E0',
+  },
+  searchButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  // Quick Cities Styles
+  quickCitiesContainer: {
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  quickCityButton: {
+    backgroundColor: '#8A4FFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  quickCityText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  // Address Suggestions Styles
+  suggestionsContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    marginTop: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 8,
+    maxHeight: 200,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
+  suggestionsHeader: {
+    backgroundColor: '#f8f9fa',
+    padding: 8,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+  },
+  suggestionsHeaderText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#495057',
+    textAlign: 'center',
+  },
+  suggestionsList: {
+    borderRadius: 12,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: 'white',
+  },
+  suggestionIcon: {
+    fontSize: 16,
+    marginRight: 12,
+  },
+  suggestionTextContainer: {
+    flex: 1,
+  },
+  suggestionMainText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 2,
+  },
+  suggestionSubText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  suggestionSeparator: {
+    height: 1,
+    backgroundColor: '#f0f0f0',
+    marginLeft: 40,
+  },
+  loadingContainer: {
+    backgroundColor: 'white',
+    padding: 12,
+    borderRadius: 12,
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  deliveryCountBadge: {
+    backgroundColor: '#8A4FFF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    marginLeft: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  deliveryCountText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  // ... (rest of the styles remain the same as previous implementation)
   photoGallerySection: {
     padding: 20,
     borderBottomWidth: 1,
@@ -918,7 +1178,6 @@ deliveryCountText: {
     height: '100%',
     borderRadius: 6,
   },
-  // Location Description Styles
   locationDescriptionSection: {
     padding: 20,
     borderBottomWidth: 1,
@@ -929,7 +1188,7 @@ deliveryCountText: {
     padding: 16,
     borderRadius: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#4ECDC4',
+    borderLeftColor: '#8A4FFF',
   },
   locationDescription: {
     fontSize: 14,
@@ -955,7 +1214,6 @@ deliveryCountText: {
     color: '#333',
     lineHeight: 18,
   },
-  // Updated Popup Styles
   popupScrollView: {
     maxHeight: '80%',
   },
@@ -970,7 +1228,6 @@ deliveryCountText: {
     shadowRadius: 20,
     elevation: 10,
   },
-  // Photos Preview in List
   photosPreview: {
     marginTop: 4,
   },
@@ -978,7 +1235,6 @@ deliveryCountText: {
     fontSize: 11,
     color: '#666',
   },
-  // ... (rest of the previous styles remain the same)
   popupOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1113,7 +1369,7 @@ deliveryCountText: {
     alignItems: 'center',
   },
   callButton: {
-    backgroundColor: '#4ECDC4',
+    backgroundColor: '#8A4FFF',
   },
   navigateButton: {
     backgroundColor: '#FFA726',
@@ -1129,7 +1385,6 @@ deliveryCountText: {
     fontSize: 16,
     fontWeight: 'bold',
   },
-  // Callout Styles
   calloutContainer: {
     backgroundColor: 'white',
     padding: 12,
@@ -1154,7 +1409,7 @@ deliveryCountText: {
   },
   calloutCustomer: {
     fontSize: 12,
-    color: '#4ECDC4',
+    color: '#8A4FFF',
     fontWeight: '600',
     marginBottom: 4,
   },
@@ -1163,7 +1418,6 @@ deliveryCountText: {
     color: '#FF6B6B',
     fontStyle: 'italic',
   },
-  // Action Buttons
   actionButtonsContainer: {
     position: 'absolute',
     bottom: 30,
@@ -1186,7 +1440,7 @@ deliveryCountText: {
     minWidth: 160,
   },
   deliveriesButton: {
-    backgroundColor: '#4ECDC4',
+    backgroundColor: '#8A4FFF',
   },
   optimizeButton: {
     backgroundColor: '#FFA726',
@@ -1239,7 +1493,7 @@ deliveryCountText: {
   },
   modalSubtitle: {
     fontSize: 14,
-    color: '#4ECDC4',
+    color: '#8A4FFF',
     fontWeight: '600',
     marginTop: 2,
   },
@@ -1250,7 +1504,7 @@ deliveryCountText: {
     marginTop: 10,
     borderRadius: 12,
     borderLeftWidth: 4,
-    borderLeftColor: '#4ECDC4',
+    borderLeftColor: '#8A4FFF',
   },
   routeInfoText: {
     fontSize: 14,
@@ -1292,7 +1546,7 @@ deliveryCountText: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#4ECDC4',
+    backgroundColor: '#8A4FFF',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 4,
