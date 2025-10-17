@@ -2,15 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Colors } from '../constants/Colors';
 import BucketReportScreen from '../screens/buckets/BucketReportScreen';
-import MyBucketsScreen from '../screens/buckets/MyBucketsScreen';
 import DashboardScreen from '../screens/main/DashboardScreen';
+import CategorizeScreen from '../../src/screens/trash/CategorizeScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
-import MapScreen from '../screens/map/MapScreen'; // Add this import
 
 export type UserTabParamList = {
   Home: undefined;
   MyBuckets: undefined;
-  Map: undefined; // Add this
+  Categorize: undefined;
+  Map: undefined; 
   BucketReport: undefined;
   Profile: undefined;
 };
@@ -50,23 +50,13 @@ export const UserTabNavigator = () => {
         }}
       />
       <Tab.Screen
-        name="MyBuckets"
-        component={MyBucketsScreen}
+        name="Categorize"
+        component={CategorizeScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="trash" size={size} color={color} />
+            <Ionicons name="add-circle" size={size} color={color} />
           ),
-          title: 'My Buckets',
-        }}
-      />
-      <Tab.Screen
-        name="Map"
-        component={MapScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="map" size={size} color={color} />
-          ),
-          title: 'Bin Map',
+          title: 'Categorize',
         }}
       />
       <Tab.Screen

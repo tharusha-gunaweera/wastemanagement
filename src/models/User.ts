@@ -99,3 +99,26 @@ export interface CollectionRequest {
   requestedAt: Date;
   collectedAt?: Date;
 }
+
+// Add to existing User.ts
+
+export interface TrashItem {
+  id: string;
+  bucketId: string;
+  bucketName: string;
+  userId: string;
+  userName: string;
+  trashType: 'organic' | 'recyclable' | 'non-recyclable';
+  weight?: number; // in kg
+  description?: string;
+  createdAt: Date;
+  status: 'added' | 'collected' | 'processed';
+}
+
+export interface TrashStats {
+  totalTrash: number;
+  organic: number;
+  recyclable: number;
+  nonRecyclable: number;
+  lastUpdated: Date;
+}

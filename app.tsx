@@ -6,10 +6,13 @@ import { Colors } from './src/constants/Colors';
 import { UserTabNavigator } from './src/navigation/UserTabNavigator';
 import WelcomeScreen from './src/screens/WelcomeScreen';
 import AdminDashboardScreen from './src/screens/admin/AdminDashboard';
+import WasteManagementAuthorityScreen from './src/screens/admin/WasteManagementAuthorityScreen';
 import { SignInScreen } from './src/screens/auth/SignInScreen';
 import { SignUpScreen } from './src/screens/auth/SignUpScreen';
 import { DriverDashboardScreen } from './src/screens/main/DriverDashboardScreen';
 import Map from './src/screens/map/MapScreen';
+import MyBucketsScreen from './src/screens/buckets/MyBucketsScreen';
+import ProfileScreen from './src/screens/main/ProfileScreen';
 import { AuthService } from './src/services/auth/AuthService';
 import { LocalStorageService } from './src/services/storage/LocalStorageService';
 
@@ -23,7 +26,10 @@ export type RootStackParamList = {
   Dashboard2: undefined;
   DriverDashboard: undefined;
   DriverDashboard2: undefined;
-  AdminDashboard: undefined; // Add AdminDashboard here
+  AdminDashboard: undefined;
+  WasteManagementAuthority: undefined;
+  MyBuckets: undefined;
+  Profile: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -41,7 +47,6 @@ export default function App() {
 
   const checkAuthStatus = async () => {
     try {
-      // Check local storage first for faster loading
       const isLoggedIn = await LocalStorageService.isUserLoggedIn();
       const accessLevel = await LocalStorageService.getAccessLevel();
       
@@ -49,10 +54,8 @@ export default function App() {
         setIsAuthenticated(true);
         setUserAccessLevel(accessLevel);
       } else {
-        // Fallback to Firebase auth
         const user = authService.getCurrentUser();
         if (user) {
-          // If user exists in Firebase but not in local storage, refresh the data
           const fullUser = await authService.getCurrentUserWithLocalStorage();
           if (fullUser) {
             setIsAuthenticated(true);
@@ -100,13 +103,12 @@ export default function App() {
         }}
       >
         {isAuthenticated ? (
-          // Authenticated screens - redirect based on access level
-          userAccessLevel === 3 ? ( // Add Admin condition first
+          userAccessLevel === 3 ? (
             <Stack.Screen
-              name="AdminDashboard"
-              component={AdminDashboardScreen}
+              name="WasteManagementAuthority"
+              component={WasteManagementAuthorityScreen}
               options={{
-                title: 'Admin Dashboard',
+                title: 'Waste Management Authority',
                 headerShown: true,
               }}
             />
@@ -120,21 +122,15 @@ export default function App() {
               }}
             />
           ) : (
-            // Regular user authenticated screens
-            <>
-              <Stack.Screen
-                name="Dashboard"
-                component={UserTabNavigator}
-                options={{
-                  title: 'Dashboard',
-                  headerShown: false,
-                }}
-              />
-              
-            </>
+            <Stack.Screen
+              name="Dashboard"
+              component={UserTabNavigator}
+              options={{
+                headerShown: false,
+              }}
+            />
           )
         ) : (
-          // Unauthenticated screens
           <>
             <Stack.Screen
               name="Welcome"
@@ -143,65 +139,19 @@ export default function App() {
                 headerShown: false,
               }}
             />
-            
-            
           </>
         )}
-        <Stack.Screen
-              name="DriverDashboard2"
-              component={DriverDashboardScreen}
-              options={{
-                title: 'Driver Dashboard',
-                headerShown: true,
-              }}
-            />
-        <Stack.Screen
-              name="SignIn"
-              component={SignInScreen}
-              options={{
-                title: 'Sign In',
-                headerShown: true,
-              }}
-            />
-        <Stack.Screen
-              name="SignUp"
-              component={SignUpScreen}
-              options={{
-                title: 'Create Account',
-                headerShown: true,
-              }}
-            />
-        <Stack.Screen
-                name="Dashboard2"
-                component={UserTabNavigator}
-                options={{
-                  title: 'Dashboard 2',
-                  headerShown: false,
-                }}
-        />
-        <Stack.Screen
-              name="Welcome2"
-              component={WelcomeScreen}
-              options={{
-                headerShown: false,
-              }}
-        />
-        <Stack.Screen
-              name="Map"
-              component={Map}
-              options={{
-                headerShown: false,
-              }}
-        />
-        {/* Add AdminDashboard screen for direct navigation */}
-        <Stack.Screen
-              name="AdminDashboard"
-              component={AdminDashboardScreen}
-              options={{
-                title: 'Admin Dashboard',
-                headerShown: true,
-              }}
-        />
+        
+        {/* Additional screens */}
+        <Stack.Screen name="MyBuckets" component={MyBucketsScreen} options={{ title: 'My Buckets' }} />
+        <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
+        <Stack.Screen name="Map" component={Map} options={{ title: 'Bin Map' }} />
+        <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ title: 'Admin Dashboard' }} />
+        <Stack.Screen name="DriverDashboard2" component={DriverDashboardScreen} options={{ title: 'Driver Dashboard' }} />
+        <Stack.Screen name="SignIn" component={SignInScreen} options={{ title: 'Sign In' }} />
+        <Stack.Screen name="SignUp" component={SignUpScreen} options={{ title: 'Create Account' }} />
+        <Stack.Screen name="Dashboard2" component={UserTabNavigator} options={{ title: 'Dashboard 2', headerShown: false }} />
+        <Stack.Screen name="Welcome2" component={WelcomeScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
