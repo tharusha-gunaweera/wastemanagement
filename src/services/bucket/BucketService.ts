@@ -1,18 +1,18 @@
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDocs, 
-  updateDoc, 
-  query, 
-  where, 
-  orderBy,
-  getDoc,
+import {
+  collection,
   deleteDoc,
-  Timestamp
+  doc,
+  getDoc,
+  getDocs,
+  orderBy,
+  query,
+  setDoc,
+  Timestamp,
+  updateDoc,
+  where
 } from 'firebase/firestore';
 import { db } from '../../config/FirebaseConfig';
-import { TrashBucket, AssignedDriver, User, TechnicianRequest } from '../../models/User';
+import { TechnicianRequest, TrashBucket, User } from '../../models/User';
 
 export class BucketService {
   // Safe date conversion helper
@@ -333,6 +333,51 @@ export class BucketService {
       throw new Error('Failed to update technician request');
     }
   }
+
+  // Add to BucketService.ts
+
+// Update bucket with location data
+async updateBucketLocation(
+  bucketId: string, 
+  latitude: number, 
+  longitude: number, 
+  address?: string
+): Promise<void> {
+  try {
+    const bucketRef = doc(db, 'buckets', bucketId);
+    
+    await updateDoc(bucketRef, {
+      latitude,
+      longitude,
+      address: address || '',
+      lastUpdated: Timestamp.fromDate(new Date())
+    });
+  } catch (error) {
+    console.error('Error updating bucket location:', error);
+    throw new Error('Failed to update bucket location');
+  }
+}
+
+// Get buckets by status
+async getBucketsByStatus(status: 'empty' | 'low' | 'medium' | 'full'): Promise<TrashBucket[]> {
+  try {
+    const allBuckets = await this.getUserBuckets('all'); // You might need to modify getUserBuckets to accept all users for admin
+    
+    return allBuckets.filter(bucket => {
+      const fillPercentage = bucket.fillPercentage || 0;
+      
+      if (status === 'empty') return fillPercentage === 0;
+      if (status === 'low') return fillPercentage > 0 && fillPercentage < 30;
+      if (status === 'medium') return fillPercentage >= 30 && fillPercentage < 70;
+      if (status === 'full') return fillPercentage >= 70;
+      
+      return false;
+    });
+  } catch (error) {
+    console.error('Error getting buckets by status:', error);
+    throw new Error('Failed to fetch buckets by status');
+  }
+}
 
   // Delete bucket
   async deleteBucket(bucketId: string): Promise<void> {

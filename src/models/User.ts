@@ -69,3 +69,33 @@ export interface TechnicianRequest {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// Add to existing User.ts file
+
+export interface BinLocation {
+  id: string;
+  bucketId: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  fillPercentage: number;
+  status: 'empty' | 'low' | 'medium' | 'full';
+  lastUpdated: Date;
+  address?: string;
+}
+
+export interface CollectionRequest {
+  id: string;
+  bucketId: string;
+  bucketName: string;
+  driverId: string;
+  driverName: string;
+  location: {
+    latitude: number;
+    longitude: number;
+    address?: string;
+  };
+  status: 'pending' | 'in-progress' | 'completed' | 'cancelled';
+  requestedAt: Date;
+  collectedAt?: Date;
+}

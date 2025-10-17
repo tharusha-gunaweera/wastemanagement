@@ -5,10 +5,12 @@ import BucketReportScreen from '../screens/buckets/BucketReportScreen';
 import MyBucketsScreen from '../screens/buckets/MyBucketsScreen';
 import DashboardScreen from '../screens/main/DashboardScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
+import MapScreen from '../screens/map/MapScreen'; // Add this import
 
 export type UserTabParamList = {
   Home: undefined;
   MyBuckets: undefined;
+  Map: undefined; // Add this
   BucketReport: undefined;
   Profile: undefined;
 };
@@ -58,6 +60,16 @@ export const UserTabNavigator = () => {
         }}
       />
       <Tab.Screen
+        name="Map"
+        component={MapScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="map" size={size} color={color} />
+          ),
+          title: 'Bin Map',
+        }}
+      />
+      <Tab.Screen
         name="BucketReport"
         component={BucketReportScreen}
         options={{
@@ -80,4 +92,3 @@ export const UserTabNavigator = () => {
     </Tab.Navigator>
   );
 };
-

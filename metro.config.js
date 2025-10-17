@@ -1,6 +1,11 @@
 const { getDefaultConfig } = require('expo/metro-config');
 
-const defaultConfig = getDefaultConfig(__dirname);
-defaultConfig.resolver.sourceExts.push('cjs')
+const config = getDefaultConfig(__dirname);
 
-module.exports = defaultConfig;
+// Add Firebase resolver
+config.resolver.extraNodeModules = {
+  ...config.resolver.extraNodeModules,
+  // Add any other modules that need resolving
+};
+
+module.exports = config;
