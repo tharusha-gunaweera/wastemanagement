@@ -5,17 +5,19 @@ import { ActivityIndicator, Text, View } from 'react-native';
 import { Colors } from './src/constants/Colors';
 import { UserTabNavigator } from './src/navigation/UserTabNavigator';
 import WelcomeScreen from './src/screens/WelcomeScreen';
+import AdminDashboardScreen from './src/screens/admin/AdminDashboard';
 import { SignInScreen } from './src/screens/auth/SignInScreen';
 import { SignUpScreen } from './src/screens/auth/SignUpScreen';
 import { DriverDashboardScreen } from './src/screens/main/DriverDashboardScreen';
+import Map from './src/screens/map/MapScreen';
 import { AuthService } from './src/services/auth/AuthService';
 import { LocalStorageService } from './src/services/storage/LocalStorageService';
-import AdminDashboardScreen from './src/screens/admin/AdminDashboard';
 
 export type RootStackParamList = {
   Welcome: undefined;
   SignIn: undefined;
   SignUp: undefined;
+  Map: undefined;
   Welcome2: undefined;
   Dashboard: undefined;
   Dashboard2: undefined;
@@ -180,6 +182,13 @@ export default function App() {
         <Stack.Screen
               name="Welcome2"
               component={WelcomeScreen}
+              options={{
+                headerShown: false,
+              }}
+        />
+        <Stack.Screen
+              name="Map"
+              component={Map}
               options={{
                 headerShown: false,
               }}

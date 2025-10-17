@@ -1,23 +1,35 @@
-import { Ionicons } from '@expo/vector-icons';
-import { StackNavigationProp } from '@react-navigation/stack';
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-    Alert,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  View,
+  Text,
+  StyleSheet,
+  Alert,
+  Modal,
+  TouchableOpacity,
+  ScrollView,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StackNavigationProp } from '@react-navigation/stack';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../../app';
-import { Button } from '../../components/common/Button';
 import { Colors } from '../../constants/Colors';
-import { BinLocation } from '../../models/User';
-import { AuthService } from '../../services/auth/AuthService';
+import { Button } from '../../components/common/Button';
 import { MapService } from '../../services/map/MapService';
+import { BinLocation, CollectionRequest } from '../../models/User';
+import { AuthService } from '../../services/auth/AuthService';
+import { db } from '../../config/FirebaseConfig';
+import { 
+  collection, 
+  getDocs, 
+  query, 
+  where, 
+  doc, 
+  getDoc, 
+  updateDoc, 
+  addDoc, 
+  serverTimestamp 
+} from "firebase/firestore";
 
 type MapScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -28,37 +40,147 @@ interface Props {
   navigation: MapScreenNavigationProp;
 }
 
+interface AssignedBin extends BinLocation {
+  assignmentId: string;
+  driverName: string;
+  assignedAt: Date;
+}
+
+// Firestore data interfaces
+interface FirestoreBucket {
+  name?: string;
+  bucketId?: string;
+  userId?: string;
+  fillPercentage?: number;
+  capacity?: number;
+  location?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  createdAt?: any;
+  lastUpdated?: any;
+  isAssigned?: boolean;
+  assignedDriverId?: string;
+  sensorUptime?: number;
+  batteryLevel?: number;
+  signalStrength?: number;
+  isOnline?: boolean;
+  lastMaintenance?: any;
+}
+
+interface FirestoreAssignment {
+  bucketId: string;
+  driverId: string;
+  driverName: string;
+  assignedAt: any;
+  status: string;
+  completedAt?: any;
+}
+
 const MapScreen: React.FC<Props> = ({ navigation }) => {
   const [binLocations, setBinLocations] = useState<BinLocation[]>([]);
+  const [assignedBins, setAssignedBins] = useState<AssignedBin[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedBin, setSelectedBin] = useState<BinLocation | null>(null);
+  const [selectedBin, setSelectedBin] = useState<AssignedBin | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [collecting, setCollecting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'all' | 'assigned'>('assigned');
 
   const mapService = new MapService();
   const authService = new AuthService();
   const currentUser = authService.getCurrentUser();
 
-  // Default coordinates (you can set this to your city's coordinates)
+  // Sri Lanka bounds for random locations
+  const sriLankaBounds = {
+    north: 9.831,   // Jaffna
+    south: 5.919,   // Hambantota
+    west: 79.521,   // Colombo
+    east: 81.879    // Trincomalee
+  };
+
+  // Default coordinates (Center of Sri Lanka)
   const defaultRegion = {
-    latitude: 6.9271,
-    longitude: 79.8612,
-    latitudeDelta: 0.0922,
-    longitudeDelta: 0.0421,
+    latitude: 7.8731,
+    longitude: 80.7718,
+    latitudeDelta: 2.0,
+    longitudeDelta: 2.0,
   };
 
   useEffect(() => {
-    loadBinLocations();
+    loadAssignedBins();
+    loadAllBins();
   }, []);
 
-  const loadBinLocations = async () => {
+  const generateRandomLocationInSriLanka = () => {
+    const latitude = sriLankaBounds.south + Math.random() * (sriLankaBounds.north - sriLankaBounds.south);
+    const longitude = sriLankaBounds.west + Math.random() * (sriLankaBounds.east - sriLankaBounds.west);
+    return { latitude, longitude };
+  };
+
+  const getRandomAddress = () => {
+    const cities = [
+      'Colombo', 'Kandy', 'Galle', 'Jaffna', 'Negombo', 'Trincomalee',
+      'Anuradhapura', 'Polonnaruwa', 'Matara', 'Hambantota', 'Ratnapura',
+      'Badulla', 'Nuwara Eliya', 'Kurunegala', 'Puttalam', 'Batticaloa'
+    ];
+    const streets = ['Main Street', 'Galle Road', 'Kandy Road', 'Lake Road', 'Beach Road', 'Temple Street'];
+    
+    return `${streets[Math.floor(Math.random() * streets.length)]}, ${cities[Math.floor(Math.random() * cities.length)]}`;
+  };
+
+  const loadAssignedBins = async () => {
     try {
-      setLoading(true);
+      if (!currentUser) return;
+
+      const assignedDriversQuery = query(
+        collection(db, 'assignedDrivers'),
+        where('driverId', '==', currentUser.uid),
+        where('status', '==', 'pending')
+      );
+
+      const querySnapshot = await getDocs(assignedDriversQuery);
+      const assignedBinsData: AssignedBin[] = [];
+
+      for (const assignmentDoc of querySnapshot.docs) {
+        const assignment = assignmentDoc.data() as FirestoreAssignment;
+        
+        // Get bucket details
+        const bucketDoc = await getDoc(doc(db, 'buckets', assignment.bucketId));
+
+        if (bucketDoc.exists()) {
+          const bucketData = bucketDoc.data() as FirestoreBucket;
+          const randomLocation = generateRandomLocationInSriLanka();
+          
+          assignedBinsData.push({
+            id: assignment.bucketId,
+            assignmentId: assignmentDoc.id,
+            bucketId: assignment.bucketId,
+            name: bucketData?.name || 'Unknown Bin',
+            latitude: bucketData?.latitude || randomLocation.latitude,
+            longitude: bucketData?.longitude || randomLocation.longitude,
+            fillPercentage: bucketData?.fillPercentage || 100,
+            status: 'full' as const,
+            lastUpdated: new Date(),
+            address: bucketData?.address || bucketData?.location || getRandomAddress(),
+            driverName: assignment.driverName,
+            assignedAt: assignment.assignedAt?.toDate() || new Date()
+          });
+        }
+      }
+
+      setAssignedBins(assignedBinsData);
+    } catch (error) {
+      console.error('Error loading assigned bins:', error);
+      Alert.alert('Error', 'Failed to load assigned bins');
+    }
+  };
+
+  const loadAllBins = async () => {
+    try {
       const locations = await mapService.getAllBinLocations();
       setBinLocations(locations);
     } catch (error) {
-      console.error('Error loading bin locations:', error);
-      Alert.alert('Error', 'Failed to load bin locations');
+      console.error('Error loading all bin locations:', error);
     } finally {
       setLoading(false);
     }
@@ -84,7 +206,7 @@ const MapScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const handleMarkerPress = (bin: BinLocation) => {
+  const handleMarkerPress = (bin: AssignedBin) => {
     setSelectedBin(bin);
     setModalVisible(true);
   };
@@ -96,12 +218,18 @@ const MapScreen: React.FC<Props> = ({ navigation }) => {
       setCollecting(true);
       
       // Mark bin as collected (reset fill percentage to 0)
-      await mapService.markBinAsCollected(selectedBin.id);
+      await mapService.markBinAsCollected(selectedBin.bucketId);
       
-      // If user is a driver, create collection request
-      if (currentUser?.accessLevel === 2) {
+      // Update assignment status to completed
+      await updateDoc(doc(db, 'assignedDrivers', selectedBin.assignmentId), {
+        status: 'completed',
+        completedAt: serverTimestamp()
+      });
+
+      // Create collection request
+      if (currentUser) {
         const requestData = {
-          bucketId: selectedBin.id,
+          bucketId: selectedBin.bucketId,
           bucketName: selectedBin.name,
           driverId: currentUser.uid,
           driverName: currentUser.displayName || currentUser.email || 'Unknown Driver',
@@ -111,17 +239,20 @@ const MapScreen: React.FC<Props> = ({ navigation }) => {
             address: selectedBin.address
           },
           status: 'completed' as const,
-          requestedAt: new Date(),
-          collectedAt: new Date()
+          requestedAt: serverTimestamp(),
+          collectedAt: serverTimestamp()
         };
 
-        await mapService.createCollectionRequest(requestData);
+        await addDoc(collection(db, 'collectionRequests'), requestData);
       }
 
       Alert.alert('Success', 'Garbage collection recorded successfully!');
       setModalVisible(false);
       setSelectedBin(null);
-      loadBinLocations(); // Refresh the map
+      
+      // Refresh the lists
+      loadAssignedBins();
+      loadAllBins();
     } catch (error) {
       console.error('Error collecting garbage:', error);
       Alert.alert('Error', 'Failed to record garbage collection');
@@ -131,20 +262,44 @@ const MapScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const renderMarkers = () => {
-    return binLocations.map((bin) => (
-      <Marker
-        key={bin.id}
-        coordinate={{
-          latitude: bin.latitude,
-          longitude: bin.longitude,
-        }}
-        onPress={() => handleMarkerPress(bin)}
-      >
-        <View style={[styles.marker, { backgroundColor: getMarkerColor(bin.status) }]}>
-          <Ionicons name="trash" size={16} color={Colors.text.inverse} />
-        </View>
-      </Marker>
-    ));
+    if (activeTab === 'assigned') {
+      // Show only assigned bins for the driver
+      return assignedBins.map((bin) => (
+        <Marker
+          key={bin.assignmentId}
+          coordinate={{
+            latitude: bin.latitude,
+            longitude: bin.longitude,
+          }}
+          onPress={() => handleMarkerPress(bin)}
+        >
+          <View style={[styles.marker, { backgroundColor: getMarkerColor(bin.status) }]}>
+            <Ionicons name="trash" size={16} color={Colors.text.inverse} />
+          </View>
+        </Marker>
+      ));
+    } else {
+      // Show all bins
+      return binLocations.map((bin) => (
+        <Marker
+          key={bin.id}
+          coordinate={{
+            latitude: bin.latitude,
+            longitude: bin.longitude,
+          }}
+          onPress={() => handleMarkerPress({ 
+            ...bin, 
+            assignmentId: '', 
+            driverName: '', 
+            assignedAt: new Date() 
+          })}
+        >
+          <View style={[styles.marker, { backgroundColor: getMarkerColor(bin.status) }]}>
+            <Ionicons name="trash" size={16} color={Colors.text.inverse} />
+          </View>
+        </Marker>
+      ));
+    }
   };
 
   return (
@@ -153,8 +308,27 @@ const MapScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={styles.title}>Bin Locations Map</Text>
         <Button
           title="Refresh"
-          onPress={loadBinLocations}
+          onPress={() => {
+            loadAssignedBins();
+            loadAllBins();
+          }}
           variant="outline"
+          fullWidth={false}
+        />
+      </View>
+
+      {/* Tab Navigation */}
+      <View style={styles.tabContainer}>
+        <Button
+          title="My Assigned Bins"
+          onPress={() => setActiveTab('assigned')}
+          variant={activeTab === 'assigned' ? 'primary' : 'outline'}
+          fullWidth={false}
+        />
+        <Button
+          title="All Bins"
+          onPress={() => setActiveTab('all')}
+          variant={activeTab === 'all' ? 'primary' : 'outline'}
           fullWidth={false}
         />
       </View>
@@ -178,6 +352,16 @@ const MapScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.legendText}>Full</Text>
         </View>
       </View>
+
+      {/* Assigned Bins Info */}
+      {activeTab === 'assigned' && (
+        <View style={styles.assignedInfo}>
+          <Ionicons name="information-circle" size={20} color={Colors.primary} />
+          <Text style={styles.assignedInfoText}>
+            {assignedBins.length} bin(s) assigned to you
+          </Text>
+        </View>
+      )}
 
       {/* Map View */}
       <View style={styles.mapContainer}>
@@ -228,17 +412,26 @@ const MapScreen: React.FC<Props> = ({ navigation }) => {
                   <Text style={styles.fillPercentage}>
                     Fill Level: {selectedBin.fillPercentage}%
                   </Text>
-                  
-                  <Text style={styles.lastUpdated}>
-                    Last Updated: {selectedBin.lastUpdated.toLocaleString()}
-                  </Text>
+
+                  {/* Assignment Info */}
+                  {activeTab === 'assigned' && (
+                    <View style={styles.assignmentInfo}>
+                      <Text style={styles.assignmentTitle}>Assignment Details</Text>
+                      <Text style={styles.assignmentText}>
+                        Assigned to: {selectedBin.driverName}
+                      </Text>
+                      <Text style={styles.assignmentText}>
+                        Assigned on: {selectedBin.assignedAt.toLocaleDateString()}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
-                {/* Garbage Collection Button - Only show for full bins */}
-                {selectedBin.status === 'full' && (
+                {/* Garbage Collection Button - Only show for assigned full bins */}
+                {activeTab === 'assigned' && selectedBin.status === 'full' && (
                   <View style={styles.collectionSection}>
                     <Text style={styles.collectionTitle}>
-                      This bin is full and ready for collection
+                      This bin is assigned to you and ready for collection
                     </Text>
                     <Button
                       title="Mark as Collected"
@@ -250,12 +443,15 @@ const MapScreen: React.FC<Props> = ({ navigation }) => {
                   </View>
                 )}
 
-                {/* Show message for non-full bins */}
-                {selectedBin.status !== 'full' && (
+                {/* Show message for non-full bins or when viewing all bins */}
+                {(activeTab === 'all' || selectedBin.status !== 'full') && (
                   <View style={styles.infoSection}>
                     <Ionicons name="information-circle" size={24} color={Colors.primary} />
                     <Text style={styles.infoText}>
-                      This bin is {getStatusText(selectedBin.status).toLowerCase()} and doesn't require immediate collection.
+                      {activeTab === 'all' 
+                        ? 'This bin is not assigned to you.' 
+                        : `This bin is ${getStatusText(selectedBin.status).toLowerCase()} and ready for collection.`
+                      }
                     </Text>
                   </View>
                 )}
@@ -286,6 +482,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: Colors.text.primary,
   },
+  tabContainer: {
+    flexDirection: 'row',
+    padding: 15,
+    gap: 10,
+  },
   legend: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -307,6 +508,20 @@ const styles = StyleSheet.create({
   legendText: {
     fontSize: 12,
     color: Colors.text.secondary,
+  },
+  assignedInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: '#E3F2FD',
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  assignedInfoText: {
+    fontSize: 14,
+    color: Colors.primary,
+    fontWeight: '500',
+    marginLeft: 8,
   },
   mapContainer: {
     flex: 1,
@@ -391,10 +606,24 @@ const styles = StyleSheet.create({
     color: Colors.text.primary,
     marginBottom: 4,
   },
-  lastUpdated: {
+  assignmentInfo: {
+    backgroundColor: Colors.background,
+    padding: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginTop: 10,
+  },
+  assignmentTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: Colors.text.primary,
+    marginBottom: 6,
+  },
+  assignmentText: {
     fontSize: 12,
     color: Colors.text.secondary,
-    fontStyle: 'italic',
+    marginBottom: 2,
   },
   collectionSection: {
     backgroundColor: Colors.background,

@@ -29,6 +29,11 @@ export const DriverDashboardScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  const navigateToMap = () => {
+    // Navigate directly to the Map screen
+    navigation.navigate('Map');
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
@@ -57,8 +62,8 @@ export const DriverDashboardScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Driver Actions</Text>
           
           <Button
-            title="View Today's Routes"
-            onPress={() => console.log('View routes')}
+            title="View Assigned Bins Map"
+            onPress={navigateToMap}
             variant="primary"
           />
           
@@ -71,6 +76,12 @@ export const DriverDashboardScreen: React.FC<Props> = ({ navigation }) => {
           <Button
             title="Report Issue"
             onPress={() => console.log('Report issue')}
+            variant="outline"
+          />
+          
+          <Button
+            title="Today's Routes"
+            onPress={() => console.log('View routes')}
             variant="outline"
           />
         </View>
