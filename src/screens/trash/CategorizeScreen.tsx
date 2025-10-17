@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator // Add this import
+  ActivityIndicator 
   ,
   Alert,
   FlatList,
@@ -98,7 +98,7 @@ const CategorizeScreen: React.FC<Props> = ({ navigation }) => {
         userId: currentUser.uid,
         userName: currentUser.displayName || currentUser.email || 'Unknown User',
         trashType: trashType,
-        weight: 1, // Default weight, can be made configurable
+        weight: 1, 
         description: `${trashService.getTrashTypeName(trashType)} waste added`,
         createdAt: new Date(),
         status: 'added'
@@ -243,7 +243,7 @@ const CategorizeScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Recent Trash Items</Text>
           {trashItems.length > 0 ? (
             <FlatList
-              data={trashItems.slice(0, 10)} // Show only recent 10 items
+              data={trashItems.slice(0, 10)} 
               renderItem={renderTrashItem}
               keyExtractor={(item) => item.id}
               scrollEnabled={false}
