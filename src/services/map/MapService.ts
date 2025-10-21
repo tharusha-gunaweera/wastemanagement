@@ -3,6 +3,22 @@ import { db } from '../../config/FirebaseConfig';
 import { BinLocation, CollectionRequest } from '../../models/User';
 
 export class MapService {
+  // Singleton instance
+  private static instance: MapService;
+
+  // Private constructor to prevent direct construction
+  private constructor() {
+    // Initialization code if needed
+  }
+
+  // Static method to get the singleton instance
+  public static getInstance(): MapService {
+    if (!MapService.instance) {
+      MapService.instance = new MapService();
+    }
+    return MapService.instance;
+  }
+
   // Safe date conversion helper
   private safeDateConversion(dateValue: any): Date {
     try {
@@ -149,3 +165,5 @@ export class MapService {
     }
   }
 }
+
+export default MapService;

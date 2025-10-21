@@ -2,11 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
 import React, { useEffect, useState } from 'react';
 import {
-    Alert,
-    FlatList,
-    StyleSheet,
-    Text,
-    View
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../../../app';
@@ -30,7 +30,7 @@ const AdminDashboardScreen: React.FC<Props> = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'requests' | 'users' | 'buckets'>('requests');
 
-  const bucketService = new BucketService();
+  const bucketService = BucketService.getInstance();
   const authService = new AuthService();
 
   useEffect(() => {

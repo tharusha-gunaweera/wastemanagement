@@ -12,8 +12,80 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { TrashItem, TrashStats } from '../../models/User';
+import { TrashObserver } from './TrashObserver';
 
 export class TrashService {
+  // Singleton instance
+  private static instance: TrashService;
+
+  // Observer pattern
+  private observers: TrashObserver[] = [];
+
+  // Private constructor to prevent direct construction
+  private constructor() {
+    // Initialization code if needed
+  }
+
+  // Static method to get the singleton instance
+  public static getInstance(): TrashService {
+    if (!TrashService.instance) {
+      TrashService.instance = new TrashService();
+    }
+    return TrashService.instance;
+  }
+
+  // Observer management methods
+  public addObserver(observer: TrashObserver): void {
+    if (!this.observers.includes(observer)) {
+      this.observers.push(observer);
+      console.log('TrashObserver added. Total observers:', this.observers.length);
+    }
+  }
+
+  public removeObserver(observer: TrashObserver): void {
+    this.observers = this.observers.filter(obs => obs !== observer);
+    console.log('TrashObserver removed. Total observers:', this.observers.length);
+  }
+
+  public removeAllObservers(): void {
+    this.observers = [];
+    console.log('All TrashObservers removed');
+  }
+
+  // Notification methods
+  private notifyTrashAdded(trashItem: TrashItem): void {
+    console.log('Notifying observers about new trash item:', trashItem.id);
+    this.observers.forEach(observer => {
+      try {
+        observer.onTrashAdded(trashItem);
+      } catch (error) {
+        console.error('Error notifying observer onTrashAdded:', error);
+      }
+    });
+  }
+
+  private notifyTrashDeleted(trashId: string): void {
+    console.log('Notifying observers about deleted trash item:', trashId);
+    this.observers.forEach(observer => {
+      try {
+        observer.onTrashDeleted(trashId);
+      } catch (error) {
+        console.error('Error notifying observer onTrashDeleted:', error);
+      }
+    });
+  }
+
+  private notifyTrashStatsUpdated(stats: TrashStats): void {
+    console.log('Notifying observers about updated trash stats');
+    this.observers.forEach(observer => {
+      try {
+        observer.onTrashStatsUpdated(stats);
+      } catch (error) {
+        console.error('Error notifying observer onTrashStatsUpdated:', error);
+      }
+    });
+  }
+
   // Safe date conversion helper
   private safeDateConversion(dateValue: any): Date {
     try {
@@ -42,8 +114,18 @@ export class TrashService {
 
       await setDoc(trashRef, trashWithTimestamp);
       
+      // Create the complete trash item for notification
+      const trashItem: TrashItem = {
+        ...trashData,
+        id: trashRef.id,
+        createdAt: trashData.createdAt, // Use original date since serverTimestamp is pending
+      };
+
       // Update bucket fill percentage
       await this.updateBucketFillPercentage(trashData.bucketId);
+      
+      // Notify observers
+      this.notifyTrashAdded(trashItem);
       
       return trashRef.id;
     } catch (error) {
@@ -126,20 +208,27 @@ export class TrashService {
   async getUserTrashStats(userId: string): Promise<TrashStats> {
     try {
       const trashItems = await this.getUserTrashItems(userId);
+      const stats = this.calculateStats(trashItems);
       
-      const stats: TrashStats = {
-        totalTrash: trashItems.length,
-        organic: trashItems.filter(item => item.trashType === 'organic').length,
-        recyclable: trashItems.filter(item => item.trashType === 'recyclable').length,
-        nonRecyclable: trashItems.filter(item => item.trashType === 'non-recyclable').length,
-        lastUpdated: new Date()
-      };
+      // Notify observers about stats update
+      this.notifyTrashStatsUpdated(stats);
       
       return stats;
     } catch (error) {
       console.error('Error getting trash stats:', error);
       throw new Error('Failed to fetch trash statistics');
     }
+  }
+
+  // Helper method to calculate statistics
+  private calculateStats(trashItems: TrashItem[]): TrashStats {
+    return {
+      totalTrash: trashItems.length,
+      organic: trashItems.filter(item => item.trashType === 'organic').length,
+      recyclable: trashItems.filter(item => item.trashType === 'recyclable').length,
+      nonRecyclable: trashItems.filter(item => item.trashType === 'non-recyclable').length,
+      lastUpdated: new Date()
+    };
   }
 
   // Update bucket fill percentage when trash is added
@@ -168,6 +257,9 @@ export class TrashService {
   async deleteTrashItem(trashId: string): Promise<void> {
     try {
       await deleteDoc(doc(db, 'trashes', trashId));
+      
+      // Notify observers
+      this.notifyTrashDeleted(trashId);
     } catch (error) {
       console.error('Error deleting trash item:', error);
       throw new Error('Failed to delete trash item');
@@ -216,3 +308,5 @@ export class TrashService {
     }
   }
 }
+
+export default TrashService;

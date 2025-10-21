@@ -1,16 +1,16 @@
-import { Ionicons } from '@expo/vector-icons';
-import { StackNavigationProp } from '@react-navigation/stack';
-import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, Alert, TouchableOpacity, Modal, TextInput, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StackNavigationProp } from '@react-navigation/stack';
+import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../../app';
 import { Button } from '../../components/common/Button';
-import { CircularProgress } from '../../components/common/CircularProgress';
 import { Input } from '../../components/common/Input';
+import { CircularProgress } from '../../components/common/CircularProgress';
 import { Colors } from '../../constants/Colors';
+import { BucketService } from '../../services/bucket/BucketService'; // Import the class
 import { TrashBucket, User } from '../../models/User';
 import { AuthService } from '../../services/auth/AuthService';
-import { BucketService } from '../../services/bucket/BucketService';
 
 type MyBucketsScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -38,7 +38,8 @@ const MyBucketsScreen: React.FC<Props> = ({ navigation }) => {
     location: '',
   });
 
-  const bucketService = new BucketService();
+  // Use Singleton instance
+  const bucketService = BucketService.getInstance(); // ✅ Singleton usage
   const authService = new AuthService();
   const currentUser = authService.getCurrentUser();
 
@@ -71,6 +72,7 @@ const MyBucketsScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  // ... rest of your MyBucketsScreen code remains the same
   const handleCreateBucket = async () => {
     if (!newBucket.name || !newBucket.bucketId || !newBucket.capacity) {
       Alert.alert('Error', 'Please fill all required fields');
@@ -149,6 +151,8 @@ const MyBucketsScreen: React.FC<Props> = ({ navigation }) => {
       setAssigning(false);
     }
   };
+
+  // ... rest of your component code (render methods, styles, etc.)
 
   const renderBucketItem = ({ item }: { item: TrashBucket }) => (
     <View style={styles.bucketCard}>

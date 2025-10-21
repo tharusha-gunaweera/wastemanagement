@@ -1,14 +1,15 @@
+import { Ionicons } from '@expo/vector-icons';
+import { StackNavigationProp } from '@react-navigation/stack';
 import React from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../../../app';
 import { Colors } from '../../constants/Colors';
 import { AuthService } from '../../services/auth/AuthService';
@@ -42,10 +43,45 @@ const WasteManagementAuthorityScreen: React.FC<Props> = ({ navigation }) => {
     navigation.navigate('AdminDashboard');
   };
 
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await authService.signOut();
+              // Navigate to login screen after successful logout
+              navigation.replace('SignIn');
+            } catch (error) {
+              console.error('Logout error:', error);
+              Alert.alert('Error', 'Failed to logout. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Waste Management Authority</Text>
+        <View style={styles.headerTop}>
+          <Text style={styles.title}>Waste Management Authority</Text>
+          <TouchableOpacity 
+            style={styles.logoutButton}
+            onPress={handleLogout}
+          >
+            <Ionicons name="log-out-outline" size={24} color={Colors.error} />
+          </TouchableOpacity>
+        </View>
         <Text style={styles.subtitle}>
           Welcome, {currentUser?.displayName || currentUser?.email}
         </Text>
@@ -176,6 +212,24 @@ const WasteManagementAuthorityScreen: React.FC<Props> = ({ navigation }) => {
             </View>
           </View>
         </View>
+
+        {/* Logout Section */}
+        <View style={styles.section}>
+          <TouchableOpacity 
+            style={styles.logoutCard}
+            onPress={handleLogout}
+          >
+            <View style={styles.logoutIcon}>
+              <Ionicons name="log-out-outline" size={24} color={Colors.error} />
+            </View>
+            <View style={styles.logoutInfo}>
+              <Text style={styles.logoutTitle}>Logout</Text>
+              <Text style={styles.logoutDescription}>
+                Sign out of your account
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -191,11 +245,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: Colors.text.primary,
-    marginBottom: 4,
+    flex: 1,
+  },
+  logoutButton: {
+    padding: 8,
   },
   subtitle: {
     fontSize: 16,
@@ -293,6 +356,38 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   featureDescription: {
+    fontSize: 14,
+    color: Colors.text.secondary,
+    lineHeight: 20,
+  },
+  logoutCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.error + '20', // Semi-transparent error color
+  },
+  logoutIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: Colors.error + '10', // Very light error color
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  logoutInfo: {
+    flex: 1,
+  },
+  logoutTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.error,
+    marginBottom: 4,
+  },
+  logoutDescription: {
     fontSize: 14,
     color: Colors.text.secondary,
     lineHeight: 20,

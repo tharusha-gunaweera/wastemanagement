@@ -30,32 +30,36 @@ const BucketReportScreen: React.FC<Props> = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [submittedRequests, setSubmittedRequests] = useState<Set<string>>(new Set());
 
-  const bucketService = new BucketService();
+  const bucketService = BucketService.getInstance();
   const authService = new AuthService();
   const currentUser = authService.getCurrentUser();
 
   useEffect(() => {
-    loadBuckets();
+    loadAllBuckets();
   }, []);
 
-  const loadBuckets = async () => {
+  const loadAllBuckets = async () => {
     try {
       setLoading(true);
-      if (currentUser) {
-        const userBuckets = await bucketService.getUserBuckets(currentUser.uid);
-        
-        // Update health metrics for each bucket
-        const updatedBuckets = await Promise.all(
-          userBuckets.map(async (bucket) => {
+      // Get ALL buckets from ALL users
+      const allBuckets = await bucketService.getAllBuckets();
+      
+      // Update health metrics for each bucket
+      const updatedBuckets = await Promise.all(
+        allBuckets.map(async (bucket) => {
+          try {
             const updatedBucket = await bucketService.updateBucketHealth(bucket.id);
             return updatedBucket;
-          })
-        );
-        
-        setBuckets(updatedBuckets);
-      }
+          } catch (error) {
+            console.error(`Error updating health for bucket ${bucket.id}:`, error);
+            return bucket; // Return original bucket if update fails
+          }
+        })
+      );
+      
+      setBuckets(updatedBuckets);
     } catch (error) {
-      console.error('Error loading buckets:', error);
+      console.error('Error loading all buckets:', error);
       Alert.alert('Error', 'Failed to load bucket health data');
     } finally {
       setLoading(false);
@@ -114,8 +118,9 @@ const BucketReportScreen: React.FC<Props> = ({ navigation }) => {
     const totalBuckets = buckets.length;
     const lowBatteryBuckets = buckets.filter(b => b.batteryLevel < 10).length;
     const reportedBuckets = buckets.filter(b => submittedRequests.has(b.id)).length;
+    const offlineBuckets = buckets.filter(b => !b.isOnline).length;
 
-    return { totalBuckets, lowBatteryBuckets, reportedBuckets };
+    return { totalBuckets, lowBatteryBuckets, reportedBuckets, offlineBuckets };
   };
 
   const stats = getStats();
@@ -137,16 +142,17 @@ const BucketReportScreen: React.FC<Props> = ({ navigation }) => {
     return '📶'.repeat(strength) + '◽'.repeat(5 - strength);
   };
 
+  const getOwnerInfo = (bucket: TrashBucket) => {
+    // In a real app, you might want to fetch user details by userId
+    // For now, just show the user ID or a generic message
+    return bucket.userId === currentUser?.uid ? 'Your Bin' : `User: ${bucket.userId.substring(0, 8)}...`;
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Bin Health Dashboard</Text>
-        <Button
-          title="Refresh"
-          onPress={loadBuckets}
-          variant="outline"
-          fullWidth={false}
-        />
+        <Text style={styles.title}>System Health Dashboard</Text>
+        
       </View>
 
       <ScrollView style={styles.content}>
@@ -165,6 +171,12 @@ const BucketReportScreen: React.FC<Props> = ({ navigation }) => {
           </View>
           
           <View style={styles.statCard}>
+            <Ionicons name="warning" size={24} color="#FFA500" />
+            <Text style={styles.statNumber}>{stats.offlineBuckets}</Text>
+            <Text style={styles.statLabel}>Offline</Text>
+          </View>
+          
+          <View style={styles.statCard}>
             <Ionicons name="construct-outline" size={24} color={Colors.primary} />
             <Text style={styles.statNumber}>{stats.reportedBuckets}</Text>
             <Text style={styles.statLabel}>Reported</Text>
@@ -173,18 +185,27 @@ const BucketReportScreen: React.FC<Props> = ({ navigation }) => {
 
         {/* Bin Health Details */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Bin Health Status</Text>
+          <Text style={styles.sectionTitle}>All Bin Health Status</Text>
           {buckets.map((bucket) => {
             const hasLowBattery = bucket.batteryLevel < 10;
             const hasReported = submittedRequests.has(bucket.id);
+            const isOwnedByCurrentUser = bucket.userId === currentUser?.uid;
 
             return (
               <View key={bucket.id} style={styles.healthCard}>
                 <View style={styles.healthHeader}>
                   <View style={styles.bucketInfo}>
-                    <Text style={styles.bucketName}>{bucket.name}</Text>
+                    <View style={styles.bucketTitleRow}>
+                      <Text style={styles.bucketName}>{bucket.name}</Text>
+                      {isOwnedByCurrentUser && (
+                        <View style={styles.ownerBadge}>
+                          <Text style={styles.ownerBadgeText}>Your Bin</Text>
+                        </View>
+                      )}
+                    </View>
                     <Text style={styles.bucketId}>ID: {bucket.bucketId}</Text>
                     <Text style={styles.bucketLocation}>{bucket.location}</Text>
+                    <Text style={styles.ownerInfo}>{getOwnerInfo(bucket)}</Text>
                   </View>
                   <View style={styles.statusIndicator}>
                     <Text style={[
@@ -224,6 +245,13 @@ const BucketReportScreen: React.FC<Props> = ({ navigation }) => {
                       {getSignalBars(bucket.signalStrength)}
                     </Text>
                   </View>
+
+                  <View style={styles.metricRow}>
+                    <Text style={styles.metricLabel}>Fill Level:</Text>
+                    <Text style={styles.metricValue}>
+                      {bucket.fillPercentage}%
+                    </Text>
+                  </View>
                 </View>
 
                 {/* Low Battery Warning - Only show Contact Technician if battery < 10% AND not already reported */}
@@ -258,11 +286,19 @@ const BucketReportScreen: React.FC<Props> = ({ navigation }) => {
             );
           })}
           
-          {buckets.length === 0 && (
+          {buckets.length === 0 && !loading && (
             <View style={styles.emptyContainer}>
               <Ionicons name="analytics-outline" size={64} color={Colors.text.secondary} />
               <Text style={styles.emptyText}>No bin data available</Text>
-              <Text style={styles.emptySubtext}>Add bins to monitor their health status</Text>
+              <Text style={styles.emptySubtext}>No bins found in the system</Text>
+            </View>
+          )}
+
+          {loading && (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="refresh" size={64} color={Colors.text.secondary} />
+              <Text style={styles.emptyText}>Loading bin data...</Text>
+              <Text style={styles.emptySubtext}>Please wait</Text>
             </View>
           )}
         </View>
@@ -295,14 +331,16 @@ const styles = StyleSheet.create({
   statsContainer: {
     flexDirection: 'row',
     padding: 15,
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   statCard: {
-    flex: 1,
+    width: '48%',
     backgroundColor: Colors.surface,
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginHorizontal: 5,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -344,11 +382,27 @@ const styles = StyleSheet.create({
   bucketInfo: {
     flex: 1,
   },
+  bucketTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   bucketName: {
     fontSize: 18,
     fontWeight: 'bold',
     color: Colors.text.primary,
-    marginBottom: 4,
+    marginRight: 8,
+  },
+  ownerBadge: {
+    backgroundColor: Colors.primary + '20',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  ownerBadgeText: {
+    fontSize: 10,
+    color: Colors.primary,
+    fontWeight: '600',
   },
   bucketId: {
     fontSize: 14,
@@ -358,6 +412,12 @@ const styles = StyleSheet.create({
   bucketLocation: {
     fontSize: 14,
     color: Colors.text.secondary,
+    marginBottom: 2,
+  },
+  ownerInfo: {
+    fontSize: 12,
+    color: Colors.text.secondary,
+    fontStyle: 'italic',
   },
   statusIndicator: {
     alignItems: 'flex-end',

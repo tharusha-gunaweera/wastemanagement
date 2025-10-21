@@ -15,6 +15,22 @@ import { db } from '../../config/FirebaseConfig';
 import { TechnicianRequest, TrashBucket, User } from '../../models/User';
 
 export class BucketService {
+  // Singleton instance
+  private static instance: BucketService;
+
+  // Private constructor to prevent direct construction
+  private constructor() {
+    // Initialization code if needed
+  }
+
+  // Static method to get the singleton instance
+  public static getInstance(): BucketService {
+    if (!BucketService.instance) {
+      BucketService.instance = new BucketService();
+    }
+    return BucketService.instance;
+  }
+
   // Safe date conversion helper
   private safeDateConversion(dateValue: any): Date {
     try {
@@ -72,6 +88,46 @@ export class BucketService {
     }
   }
 
+  // NEW METHOD: Get all buckets from all users (for admin/reporting)
+  async getAllBuckets(): Promise<TrashBucket[]> {
+    try {
+      const bucketsQuery = query(
+        collection(db, 'buckets'),
+        orderBy('lastUpdated', 'desc')
+      );
+      
+      const querySnapshot = await getDocs(bucketsQuery);
+      const buckets: TrashBucket[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        buckets.push({
+          id: doc.id,
+          name: data.name,
+          bucketId: data.bucketId,
+          userId: data.userId,
+          fillPercentage: data.fillPercentage || 0,
+          capacity: data.capacity || 0,
+          location: data.location || '',
+          createdAt: this.safeDateConversion(data.createdAt),
+          lastUpdated: this.safeDateConversion(data.lastUpdated),
+          isAssigned: data.isAssigned || false,
+          assignedDriverId: data.assignedDriverId,
+          sensorUptime: data.sensorUptime || 100,
+          batteryLevel: data.batteryLevel || 100,
+          signalStrength: data.signalStrength || 5,
+          isOnline: data.isOnline !== undefined ? data.isOnline : true,
+          lastMaintenance: this.safeDateConversion(data.lastMaintenance)
+        });
+      });
+      
+      return buckets;
+    } catch (error) {
+      console.error('Error getting all buckets:', error);
+      throw new Error('Failed to fetch all buckets');
+    }
+  }
+
   // Check if bucket ID already exists
   async isBucketIdUnique(bucketId: string): Promise<boolean> {
     try {
@@ -91,10 +147,12 @@ export class BucketService {
   // Create new bucket with health metrics
   async createBucket(bucketData: Omit<TrashBucket, 'id'>): Promise<string> {
     try {
+      // Validate bucket ID
       if (bucketData.bucketId.length !== 6 || !/^\d+$/.test(bucketData.bucketId)) {
         throw new Error('Bucket ID must be exactly 6 digits');
       }
 
+      // Check if bucket ID is unique
       const isUnique = await this.isBucketIdUnique(bucketData.bucketId);
       if (!isUnique) {
         throw new Error('Bucket ID already exists');
@@ -102,7 +160,7 @@ export class BucketService {
 
       const bucketRef = doc(collection(db, 'buckets'));
       
-      // Generate random health metrics
+      // Generate initial health metrics
       const bucketWithHealthMetrics = {
         ...bucketData,
         sensorUptime: 100, // Start with perfect uptime
@@ -215,11 +273,13 @@ export class BucketService {
       const bucketRef = doc(db, 'buckets', bucketId);
       const assignmentRef = doc(collection(db, 'assignedDrivers'));
       
+      // Update bucket
       await updateDoc(bucketRef, {
         isAssigned: true,
         assignedDriverId: driverId
       });
 
+      // Create assignment record
       const assignment = {
         bucketId,
         driverId,
@@ -333,51 +393,6 @@ export class BucketService {
       throw new Error('Failed to update technician request');
     }
   }
-
-  // Add to BucketService.ts
-
-// Update bucket with location data
-async updateBucketLocation(
-  bucketId: string, 
-  latitude: number, 
-  longitude: number, 
-  address?: string
-): Promise<void> {
-  try {
-    const bucketRef = doc(db, 'buckets', bucketId);
-    
-    await updateDoc(bucketRef, {
-      latitude,
-      longitude,
-      address: address || '',
-      lastUpdated: Timestamp.fromDate(new Date())
-    });
-  } catch (error) {
-    console.error('Error updating bucket location:', error);
-    throw new Error('Failed to update bucket location');
-  }
-}
-
-// Get buckets by status
-async getBucketsByStatus(status: 'empty' | 'low' | 'medium' | 'full'): Promise<TrashBucket[]> {
-  try {
-    const allBuckets = await this.getUserBuckets('all'); // You might need to modify getUserBuckets to accept all users for admin
-    
-    return allBuckets.filter(bucket => {
-      const fillPercentage = bucket.fillPercentage || 0;
-      
-      if (status === 'empty') return fillPercentage === 0;
-      if (status === 'low') return fillPercentage > 0 && fillPercentage < 30;
-      if (status === 'medium') return fillPercentage >= 30 && fillPercentage < 70;
-      if (status === 'full') return fillPercentage >= 70;
-      
-      return false;
-    });
-  } catch (error) {
-    console.error('Error getting buckets by status:', error);
-    throw new Error('Failed to fetch buckets by status');
-  }
-}
 
   // Delete bucket
   async deleteBucket(bucketId: string): Promise<void> {

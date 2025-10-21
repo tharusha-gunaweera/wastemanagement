@@ -1,9 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StackNavigationProp } from '@react-navigation/stack';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-  ActivityIndicator 
-  ,
+  ActivityIndicator,
   Alert,
   FlatList,
   Modal,
@@ -21,6 +20,7 @@ import { TrashBucket, TrashItem, TrashStats } from '../../models/User';
 import { AuthService } from '../../services/auth/AuthService';
 import { BucketService } from '../../services/bucket/BucketService';
 import { TrashService } from '../../services/trash/TrashService';
+import { TrashObserver } from '../../services/trash/TrashObserver';
 
 type CategorizeScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -31,23 +31,90 @@ interface Props {
   navigation: CategorizeScreenNavigationProp;
 }
 
-const CategorizeScreen: React.FC<Props> = ({ navigation }) => {
-  const [buckets, setBuckets] = useState<TrashBucket[]>([]);
+// Custom hook for trash observer
+const useTrashObserver = () => {
   const [trashItems, setTrashItems] = useState<TrashItem[]>([]);
   const [trashStats, setTrashStats] = useState<TrashStats | null>(null);
+  
+  const trashObserver: TrashObserver = {
+    onTrashAdded: useCallback((trashItem: TrashItem) => {
+      console.log('Trash added notification received:', trashItem.id);
+      setTrashItems(prev => [trashItem, ...prev]);
+      setTrashStats(prev => {
+        if (!prev) {
+          return {
+            totalTrash: 1,
+            organic: trashItem.trashType === 'organic' ? 1 : 0,
+            recyclable: trashItem.trashType === 'recyclable' ? 1 : 0,
+            nonRecyclable: trashItem.trashType === 'non-recyclable' ? 1 : 0,
+            lastUpdated: new Date()
+          };
+        }
+        return {
+          totalTrash: prev.totalTrash + 1,
+          organic: prev.organic + (trashItem.trashType === 'organic' ? 1 : 0),
+          recyclable: prev.recyclable + (trashItem.trashType === 'recyclable' ? 1 : 0),
+          nonRecyclable: prev.nonRecyclable + (trashItem.trashType === 'non-recyclable' ? 1 : 0),
+          lastUpdated: new Date()
+        };
+      });
+    }, []),
+
+    onTrashDeleted: useCallback((trashId: string) => {
+      console.log('Trash deleted notification received:', trashId);
+      setTrashItems(prev => prev.filter(item => item.id !== trashId));
+      setTrashStats(prev => {
+        if (!prev) return null;
+        const remainingItems = trashItems.filter(item => item.id !== trashId);
+        return {
+          totalTrash: remainingItems.length,
+          organic: remainingItems.filter(item => item.trashType === 'organic').length,
+          recyclable: remainingItems.filter(item => item.trashType === 'recyclable').length,
+          nonRecyclable: remainingItems.filter(item => item.trashType === 'non-recyclable').length,
+          lastUpdated: new Date()
+        };
+      });
+    }, [trashItems]),
+
+    onTrashStatsUpdated: useCallback((stats: TrashStats) => {
+      console.log('Trash stats updated notification received');
+      setTrashStats(stats);
+    }, [])
+  };
+
+  return { trashItems, setTrashItems, trashStats, setTrashStats, trashObserver };
+};
+
+const CategorizeScreen: React.FC<Props> = ({ navigation }) => {
+  const [buckets, setBuckets] = useState<TrashBucket[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [bucketModalVisible, setBucketModalVisible] = useState(false);
   const [selectedBucket, setSelectedBucket] = useState<TrashBucket | null>(null);
   const [addingTrash, setAddingTrash] = useState(false);
 
-  const trashService = new TrashService();
-  const bucketService = new BucketService();
+  const { 
+    trashItems, 
+    setTrashItems, 
+    trashStats, 
+    setTrashStats, 
+    trashObserver 
+  } = useTrashObserver();
+
+  const trashService = TrashService.getInstance();
+  const bucketService = BucketService.getInstance();
   const authService = new AuthService();
   const currentUser = authService.getCurrentUser();
 
   useEffect(() => {
+    // Register observer
+    trashService.addObserver(trashObserver);
     loadData();
+
+    // Cleanup: remove observer on unmount
+    return () => {
+      trashService.removeObserver(trashObserver);
+    };
   }, []);
 
   const loadData = async () => {
@@ -109,7 +176,7 @@ const CategorizeScreen: React.FC<Props> = ({ navigation }) => {
       Alert.alert(
         'Success', 
         `${trashService.getTrashTypeName(trashType)} waste added to ${selectedBucket.name}!`,
-        [{ text: 'OK', onPress: loadData }]
+        [{ text: 'OK' }] // No need for loadData - observer will handle update
       );
       
       setModalVisible(false);
@@ -134,7 +201,7 @@ const CategorizeScreen: React.FC<Props> = ({ navigation }) => {
           onPress: async () => {
             try {
               await trashService.deleteTrashItem(trashItem.id);
-              loadData();
+              // No need to call loadData - observer will handle the update
               Alert.alert('Success', 'Trash item deleted successfully');
             } catch (error) {
               console.error('Error deleting trash:', error);
@@ -357,6 +424,7 @@ const CategorizeScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
+// Keep all your existing styles exactly as they were
 const styles = StyleSheet.create({
   container: {
     flex: 1,

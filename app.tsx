@@ -9,10 +9,10 @@ import AdminDashboardScreen from './src/screens/admin/AdminDashboard';
 import WasteManagementAuthorityScreen from './src/screens/admin/WasteManagementAuthorityScreen';
 import { SignInScreen } from './src/screens/auth/SignInScreen';
 import { SignUpScreen } from './src/screens/auth/SignUpScreen';
-import { DriverDashboardScreen } from './src/screens/main/DriverDashboardScreen';
-import Map from './src/screens/map/MapScreen';
 import MyBucketsScreen from './src/screens/buckets/MyBucketsScreen';
+import { DriverDashboardScreen } from './src/screens/main/DriverDashboardScreen';
 import ProfileScreen from './src/screens/main/ProfileScreen';
+import Map from './src/screens/map/MapScreen';
 import { AuthService } from './src/services/auth/AuthService';
 import { LocalStorageService } from './src/services/storage/LocalStorageService';
 
@@ -28,6 +28,7 @@ export type RootStackParamList = {
   DriverDashboard2: undefined;
   AdminDashboard: undefined;
   WasteManagementAuthority: undefined;
+  WasteManagementAuthority2:undefined;
   MyBuckets: undefined;
   Profile: undefined;
 };
@@ -104,6 +105,7 @@ export default function App() {
       >
         {isAuthenticated ? (
           userAccessLevel === 3 ? (
+            // Waste Management Authority (Access Level 3)
             <Stack.Screen
               name="WasteManagementAuthority"
               component={WasteManagementAuthorityScreen}
@@ -113,6 +115,7 @@ export default function App() {
               }}
             />
           ) : userAccessLevel === 2 ? (
+            // Driver (Access Level 2)
             <Stack.Screen
               name="DriverDashboard"
               component={DriverDashboardScreen}
@@ -122,6 +125,7 @@ export default function App() {
               }}
             />
           ) : (
+            // Regular User (Access Level 1)
             <Stack.Screen
               name="Dashboard"
               component={UserTabNavigator}
@@ -131,6 +135,7 @@ export default function App() {
             />
           )
         ) : (
+          // Unauthenticated users
           <>
             <Stack.Screen
               name="Welcome"
@@ -142,11 +147,22 @@ export default function App() {
           </>
         )}
         
-        {/* Additional screens */}
+        {/* Additional screens for navigation from within the app */}
         <Stack.Screen name="MyBuckets" component={MyBucketsScreen} options={{ title: 'My Buckets' }} />
         <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
         <Stack.Screen name="Map" component={Map} options={{ title: 'Bin Map' }} />
         <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} options={{ title: 'Admin Dashboard' }} />
+        
+        <Stack.Screen
+              name="WasteManagementAuthority2"
+              component={WasteManagementAuthorityScreen}
+              options={{
+                title: 'Waste Management Authority',
+                headerShown: true,
+              }}
+            />
+        
+        {/* Backup/alternative screens */}
         <Stack.Screen name="DriverDashboard2" component={DriverDashboardScreen} options={{ title: 'Driver Dashboard' }} />
         <Stack.Screen name="SignIn" component={SignInScreen} options={{ title: 'Sign In' }} />
         <Stack.Screen name="SignUp" component={SignUpScreen} options={{ title: 'Create Account' }} />

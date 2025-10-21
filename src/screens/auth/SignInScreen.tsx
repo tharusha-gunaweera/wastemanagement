@@ -22,6 +22,8 @@ export const SignInScreen: React.FC<Props> = ({ navigation }) => {
   const handleSuccess = (accessLevel: number) => {
     if (accessLevel === 2) {
       navigation.replace('DriverDashboard2');
+    } else if (accessLevel === 3) {
+      navigation.replace('WasteManagementAuthority2'); 
     } else {
       navigation.replace('Dashboard2');
     }
